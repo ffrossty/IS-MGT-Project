@@ -1,0 +1,66 @@
+<%- include('../partials/admin-header') %>
+<% const dot = (on) => `<span class="status-dot ${on ? 'on' : 'off'}"></span>${on ? 'ตั้งค่าแล้ว' : '<strong>ยังไม่ได้ตั้งค่า</strong>'}`; %>
+<div class="grid-2" style="align-items:start">
+  <div class="stack">
+    <div class="card">
+      <h3>LINE Login</h3>
+      <p><%- dot(status.lineLogin) %></p>
+      <dl class="kv small">
+        <dt>Callback URL</dt><dd><div class="code-box"><%= status.callback %></div><div class="hint">ลงทะเบียน URL นี้ใน LINE Developers › LINE Login channel › Callback URL</div></dd>
+        <dt>ต้องตั้งค่า</dt><dd class="mono">LINE_LOGIN_CHANNEL_ID, LINE_LOGIN_CHANNEL_SECRET</dd>
+        <dt>Admin ใน .env</dt><dd><%= status.adminIds %> บัญชี</dd>
+        <dt>Dev Login</dt><dd><%= status.devLogin ? 'เปิดอยู่ (ปิดก่อนใช้งานจริง: NODE_ENV=production)' : 'ปิด' %></dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h3>LINE OA (Messaging API)</h3>
+      <p><%- dot(status.lineMessaging) %></p>
+      <dl class="kv small">
+        <dt>ต้องตั้งค่า</dt><dd class="mono">LINE_MESSAGING_CHANNEL_ACCESS_TOKEN</dd>
+        <dt>OA Basic ID</dt><dd><%= status.oa || '-' %></dd>
+        <dt>แจ้งเตือน</dt><dd>1) ยืนยันคำสั่งจอง 2) จัดส่งสินค้าแล้ว</dd>
+      </dl>
+      <p class="small muted">LINE Login channel และ Messaging API channel ต้องอยู่ใน Provider เดียวกัน และลูกค้าต้องเพิ่ม OA เป็นเพื่อน จึงจะได้รับข้อความ</p>
+      <form method="post" action="/admin/system/line-test"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm secondary">ส่งข้อความทดสอบถึง LINE ของฉัน</button></form>
+      <h4 style="margin-top:18px">ประวัติการส่งล่าสุด</h4>
+      <ul class="event-list">
+        <% notifications.forEach(n => { %><li><span class="badge <%= n.status === 'sent' ? 'ok' : n.status === 'failed' ? 'bad' : 'muted' %>"><%= n.status %></span> <a class="link mono" href="/admin/orders/<%= n.code %>"><%= n.code %></a> · <%= n.type %> <span class="small muted"><%= T.dt(n.created_at) %></span><% if (n.error) { %><div class="small muted"><%= n.error %></div><% } %></li><% }) %>
+        <% if (!notifications.length) { %><li class="muted small">ยังไม่มี</li><% } %>
+      </ul>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <h3>Google Sheets</h3>
+      <p><%- dot(status.sheets) %></p>
+      <dl class="kv small">
+        <dt>ต้องตั้งค่า</dt><dd class="mono">GOOGLE_SHEETS_SPREADSHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY (หรือ _JSON_PATH)</dd>
+        <dt>Service Account</dt><dd class="mono"><%= status.serviceEmail || '-' %></dd>
+        <dt>ชีต</dt><dd><%= status.sheetName %></dd>
+        <dt>คิวการซิงก์</dt><dd><% syncStats.forEach(s => { %><span class="badge plain"><%= s.status %>: <%= s.n %></span> <% }) %><% if (!syncStats.length) { %>-<% } %></dd>
+      </dl>
+      <p class="small muted">ฐานข้อมูลหลักคือ Database ของระบบ — Google Sheets เป็นสำเนาเพื่อสรุปรายงาน (1 แถวต่อ 1 Order ID ป้องกันข้อมูลซ้ำ) ระบบซิงก์อัตโนมัติทุกครั้งที่มีการเปลี่ยนแปลง และลองใหม่ทุก 1 นาทีหากล้มเหลว</p>
+      <div class="row">
+        <form method="post" action="/admin/system/sheets-sync"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm secondary">ซิงก์รายการค้าง</button></form>
+        <form method="post" action="/admin/system/sheets-sync" data-confirm="ซิงก์คำสั่งซื้อทั้งหมดใหม่?"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="all" value="1"><button class="btn sm secondary">ซิงก์ทั้งหมดใหม่</button></form>
+        <% if (status.sheetUrl) { %><a class="btn sm" target="_blank" rel="noopener" href="<%= status.sheetUrl %>">เปิด Google Sheets ↗</a><% } %>
+      </div>
+      <% if (syncErrors.length) { %><h4 style="margin-top:14px">ข้อผิดพลาดล่าสุด</h4><ul class="event-list"><% syncErrors.forEach(e => { %><li class="small"><span class="mono"><%= e.code %></span> — <%= e.last_error %></li><% }) %></ul><% } %>
+    </div>
+    <div class="card">
+      <h3>สำรองข้อมูล (Backup)</h3>
+      <p class="small muted">ระบบสำรองฐานข้อมูลอัตโนมัติทุก 24 ชั่วโมง (เก็บล่าสุดตาม BACKUP_KEEP) · ควรสำรองโฟลเดอร์ <span class="mono">uploads/</span> (รูปสินค้าและสลิป) ด้วย</p>
+      <form method="post" action="/admin/system/backup"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm">สำรองข้อมูลตอนนี้</button></form>
+      <table class="table" style="margin-top:10px"><tbody>
+        <% backups.forEach(b => { %><tr><td class="mono small"><%= b.name %></td><td class="small right"><%= (b.size/1024).toFixed(0) %> KB</td><td class="small nowrap"><%= T.dt(b.mtime) %></td><td><a class="link small" href="/admin/system/backups/<%= encodeURIComponent(b.name) %>">ดาวน์โหลด</a></td></tr><% }) %>
+        <% if (!backups.length) { %><tr><td class="muted small">ยังไม่มีไฟล์สำรอง</td></tr><% } %>
+      </tbody></table>
+    </div>
+    <div class="card">
+      <h3>งานอัตโนมัติ</h3>
+      <p class="small muted">ทุก 1 นาที ระบบจะ: ปลดล็อกสต็อกของคำสั่งซื้อที่หมดเวลาชำระเงิน, ติดธงคำสั่งซื้อที่เกินเวลาตรวจสอบ, ซิงก์ Google Sheets</p>
+      <form method="post" action="/admin/system/run-jobs"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm secondary">รันตอนนี้</button></form>
+    </div>
+  </div>
+</div>
+<%- include('../partials/admin-footer') %>

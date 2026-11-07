@@ -1,0 +1,15 @@
+<%- include('../partials/admin-header') %>
+<div class="card" style="padding:0"><div class="table-wrap"><table class="table">
+  <thead><tr><th>เวลา</th><th>ผู้ใช้</th><th>การกระทำ</th><th>ข้อมูล</th><th>รายละเอียด</th><th>IP</th></tr></thead>
+  <tbody>
+  <% logs.forEach(l => { %>
+    <tr><td class="nowrap small"><%= T.dt(l.created_at) %></td><td><%= l.display_name || '-' %></td><td><span class="badge plain"><%= l.action %></span></td><td class="small"><%= l.entity %> <span class="mono"><%= l.entity_id || '' %></span></td>
+      <td class="small" style="max-width:420px"><% if (l.before_json || l.after_json) { %><details><summary class="link" style="cursor:pointer">ดู</summary>
+        <% if (l.before_json) { %><div class="muted">ก่อน</div><pre class="code-box" style="white-space:pre-wrap"><%= l.before_json %></pre><% } %>
+        <% if (l.after_json) { %><div class="muted">หลัง</div><pre class="code-box" style="white-space:pre-wrap"><%= l.after_json %></pre><% } %></details><% } %></td>
+      <td class="small mono"><%= l.ip || '' %></td></tr>
+  <% }) %>
+  </tbody>
+</table></div></div>
+<p class="small muted" style="margin-top:12px">ประวัติการเปลี่ยนแปลงของแต่ละคำสั่งซื้อดูได้ในหน้า Order Details · แสดง 300 รายการล่าสุด</p>
+<%- include('../partials/admin-footer') %>

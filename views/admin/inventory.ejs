@@ -1,0 +1,29 @@
+<%- include('../partials/admin-header') %>
+<form method="get" class="toolbar card" style="padding:14px">
+  <div class="field"><label>ตรวจสอบช่วงเวลา: ตั้งแต่</label><input type="datetime-local" name="from" value="<%= from %>"></div>
+  <div class="field"><label>ถึง</label><input type="datetime-local" name="to" value="<%= to %>"></div>
+  <button class="btn sm">คำนวณจำนวนว่าง</button>
+  <span class="small muted">ตัวเลขด้านล่างเป็นสถานะ ณ ขณะนี้</span>
+</form>
+<div class="card" style="padding:0"><div class="table-wrap"><table class="table">
+  <thead><tr><th>สินค้า / ไซส์</th><th class="right">สต็อกทั้งหมด</th><th class="right">ว่างตอนนี้</th><th class="right">ล็อกชั่วคราว</th><th class="right">จองแล้ว (ยืนยัน)</th><th class="right">กำลังเช่า</th><th class="right">ซัก/ตรวจหลังคืน</th><th class="right">ปิดชั่วคราว</th><% if (from && to) { %><th class="right">ว่างในช่วงที่เลือก</th><% } %><th>ปรับสต็อก</th></tr></thead>
+  <tbody>
+  <% rows.forEach(r => { %>
+    <tr>
+      <td><a class="link" href="/admin/products/<%= r.product_id %>/calendar"><%= r.product_name %></a> <span class="badge plain"><%= r.size_label %></span><% if (!r.is_active) { %> <span class="badge muted">ซ่อน</span><% } %></td>
+      <td class="right"><strong><%= r.st.stock %></strong></td>
+      <td class="right" style="color:<%= r.st.freeNow ? 'var(--ok)' : 'var(--bad)' %>"><strong><%= r.st.freeNow %></strong></td>
+      <td class="right"><%= r.st.held %></td>
+      <td class="right"><%= r.st.booked %></td>
+      <td class="right"><%= r.st.renting %></td>
+      <td class="right"><%= r.st.cleaning %></td>
+      <td class="right" title="<%= r.st.blocks.map(b => L.BLOCK_REASON[b.reason] + ' ' + b.qty).join(', ') %>"><%= r.st.blockedNow %></td>
+      <% if (from && to) { %><td class="right"><strong><%= r.rangeFree %></strong></td><% } %>
+      <td class="nowrap"><form method="post" action="/admin/skus/<%= r.id %>/stock" class="row" style="gap:4px;flex-wrap:nowrap"><input type="hidden" name="_csrf" value="<%= csrf %>">
+        <input type="number" name="delta" value="1" style="width:64px;padding:6px"><button class="btn sm secondary" title="ใส่ค่าลบเพื่อลด">ปรับ ±</button></form></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table></div></div>
+<p class="small muted" style="margin-top:12px">ล็อกชั่วคราว = คำสั่งจองที่รอชำระเงิน/รอแอดมินยืนยัน · จองแล้ว = ยืนยันแล้วและยังไม่สิ้นสุดช่วงทำความสะอาด (รวมการจองล่วงหน้า) · ปิดชั่วคราว = ซ่อม/ซัก/จองนอกระบบ</p>
+<%- include('../partials/admin-footer') %>

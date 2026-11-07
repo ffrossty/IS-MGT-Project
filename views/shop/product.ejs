@@ -1,0 +1,97 @@
+<%- include('../partials/header') %>
+<div class="container">
+  <div class="small muted" style="margin-top:20px"><a href="/" class="link">คอลเลกชัน</a> / <%= p.category_name || 'สินค้า' %></div>
+  <% if (!p.is_active) { %><div class="flash warn">สินค้านี้ถูกซ่อนจากหน้าร้าน (คุณเห็นเพราะเป็น Admin)</div><% } %>
+  <div class="pdp">
+    <div class="gallery" data-gallery>
+      <div class="main"><img src="<%= h.img(images[0] && images[0].filename) %>" alt="<%= p.name %>" data-main></div>
+      <% if (images.length > 1) { %>
+        <div class="thumbs">
+          <% images.forEach((im, i) => { %><button type="button" class="<%= i===0?'active':'' %>" data-src="<%= h.img(im.filename) %>"><img src="<%= h.img(im.filename) %>" alt=""></button><% }) %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="pdp-info">
+      <div class="eyebrow"><%= p.category_name || 'Collection' %></div>
+      <h1><%= p.name %></h1>
+      <div class="pdp-price"><span data-price><%= baht(p.base_price) %></span> <small data-price-note>/ <%= p.base_days %> วัน<% if (p.extra_day_price) { %> · วันถัดไป +<%= baht(p.extra_day_price) %>/วัน<% } %></small></div>
+
+      <form method="post" action="/cart/add" id="book" data-product="<%= p.id %>" style="margin-top:22px">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <input type="hidden" name="product_id" value="<%= p.id %>">
+
+        <div class="field">
+          <label>เลือกไซส์ <a href="#sizechart" class="link small" style="font-weight:400;margin-left:6px">ตารางขนาด</a></label>
+          <div class="size-select">
+            <% skus.forEach((s, i) => { %>
+              <input type="radio" name="sku_id" id="sku<%= s.id %>" value="<%= s.id %>" <%= s.stock_qty === 0 ? 'disabled' : '' %> <%= i === skus.findIndex(x => x.stock_qty > 0) ? 'checked' : '' %>>
+              <label for="sku<%= s.id %>"><%= s.size_label %><small>มี <%= s.stock_qty %> ตัว</small></label>
+            <% }) %>
+            <% if (!skus.length) { %><span class="muted small">ยังไม่มีไซส์สำหรับสินค้านี้</span><% } %>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="b_date" class="req">วันเริ่มเช่า</label>
+            <input type="date" id="b_date" name="start_date" value="<%= rental.date %>" min="<%= minDate %>" required>
+          </div>
+          <div class="field">
+            <label for="b_time" class="req">เวลาเริ่มเช่า</label>
+            <select id="b_time" name="start_time">
+              <% timeOptions.forEach(t => { %><option value="<%= t %>" <%= defaultTime === t ? 'selected' : '' %>><%= t %> น.</option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="b_days" class="req">ระยะเวลาเช่า</label>
+            <select id="b_days" name="days" required>
+              <% durations.forEach(d => { %><option value="<%= d %>" <%= (rental.days || p.base_days) === d ? 'selected' : '' %>><%= d %> วัน (<%= d*24 %> ชั่วโมง)</option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label>จำนวน</label>
+            <div class="qty" data-qty>
+              <button type="button" data-step="-1" aria-label="ลด">−</button>
+              <input type="number" name="qty" value="1" min="1" max="20" inputmode="numeric">
+              <button type="button" data-step="1" aria-label="เพิ่ม">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="avail-box" data-avail>เลือกไซส์ วัน และเวลา เพื่อตรวจสอบสต็อกที่ว่าง</div>
+
+        <div class="row" style="gap:10px">
+          <% if (user) { %>
+            <button class="btn" style="flex:1" data-submit>เพิ่มลงตะกร้า</button>
+            <button class="btn secondary" name="next" value="product" data-submit>เพิ่ม & เลือกชุดอื่นต่อ</button>
+          <% } else { %>
+            <a class="btn line block" href="/login">เข้าสู่ระบบด้วย LINE เพื่อจอง</a>
+          <% } %>
+        </div>
+        <p class="small muted" style="margin-top:10px">ระยะเวลาเช่านับเป็นชั่วโมงจากเวลาที่เริ่มเช่า (1 วัน = 24 ชม.) · ร้านใช้เวลาเตรียมชุด <%= buffers.before %> ชม. ก่อนเริ่มเช่า และตรวจสอบ/ทำความสะอาด <%= buffers.after %> ชม. หลังคืน</p>
+      </form>
+
+      <div class="card" style="margin-top:22px">
+        <div class="card-title"><h3>ปฏิทินวันว่าง</h3><span class="small muted" data-cal-note></span></div>
+        <div class="cal" data-calendar></div>
+        <div class="cal-legend"><span class="l-free">ว่าง (เริ่มเช่าได้)</span><span class="l-full">เต็ม</span><span class="l-closed">ปิดรับจอง</span></div>
+      </div>
+
+      <div style="margin-top:22px">
+        <details class="acc" open><summary>รายละเอียดสินค้า</summary><div><%= p.description || '-' %></div></details>
+        <details class="acc" id="sizechart" <%= sizeChart ? 'open' : '' %>><summary>ตารางขนาด (Size Chart)</summary><div style="white-space:normal">
+          <% if (sizeChart) { %>
+            <div class="table-wrap"><table class="size-chart"><thead><tr><% sizeChart.head.forEach(c => { %><th><%= c %></th><% }) %></tr></thead>
+            <tbody><% sizeChart.rows.forEach(r => { %><tr><% r.forEach(c => { %><td><%= c %></td><% }) %></tr><% }) %></tbody></table></div>
+          <% } else { %>ยังไม่มีตารางขนาด<% } %>
+        </div></details>
+        <details class="acc"><summary>เงื่อนไขการเช่า</summary><div><%= p.conditions ? p.conditions + '\n\n' : '' %><%= settings.rental_terms %>
+
+เวลารับ/เริ่มเช่าและคืนชุด: <%= String(settings.pickup_start_hour).padStart(2,'0') %>:00 – <%= String(settings.pickup_end_hour).padStart(2,'0') %>:00 น.
+ต้องจองล่วงหน้าอย่างน้อย <%= settings.min_advance_hours %> ชั่วโมง</div></details>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/footer') %>

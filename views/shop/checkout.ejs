@@ -1,0 +1,69 @@
+<%- include('../partials/header') %>
+<%
+  const fld = (name, label, type, extra) => {
+    const e = errors[name];
+    return `<div class="field ${e ? 'has-error' : ''} ${extra && extra.full ? 'full' : ''}"><label for="${name}" class="req">${label}</label>` +
+      `<input type="${type || 'text'}" id="${name}" name="${name}" value="${h.esc(form[name] || '')}" required ${extra && extra.attrs ? extra.attrs : ''}>` +
+      (e ? `<div class="err">${e}</div>` : '') + `</div>`;
+  };
+%>
+<div class="container">
+  <%- include('../partials/steps', { step: 1 }) %>
+  <h1>ข้อมูลการจัดส่ง</h1>
+  <form method="post" action="/checkout" class="grid-2 wide-left" style="align-items:start" novalidate data-validate>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div>
+      <div class="card">
+        <h3>วิธีการจัดส่ง</h3>
+        <label class="ship-option">
+          <input type="radio" name="shipping_method" value="ems" <%= form.shipping_method !== 'express' ? 'checked' : '' %> data-fee="<%= emsFee %>">
+          <strong>ไปรษณีย์ไทย EMS</strong> <span style="float:right"><%= baht(emsFee) %></span>
+          <div class="sub">จัดส่งผ่านไปรษณีย์ไทย พร้อมเลข Tracking สำหรับติดตามพัสดุ</div>
+        </label>
+        <label class="ship-option">
+          <input type="radio" name="shipping_method" value="express" <%= form.shipping_method === 'express' ? 'checked' : '' %> data-fee="0">
+          <strong>Express Delivery</strong> <span class="muted small">Grab / Lalamove</span>
+          <div class="sub">ค่าส่งตามจริง ณ เวลานั้น ๆ (ต้นทาง: <%= settings.express_origin %>) — ลูกค้าเป็นผู้รับผิดชอบค่าขนส่งทั้งหมด ชำระกับผู้ให้บริการขนส่งโดยตรง</div>
+        </label>
+        <% if (errors.shipping_method) { %><div class="err small" style="color:var(--bad)"><%= errors.shipping_method %></div><% } %>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>ข้อมูลผู้รับ</h3>
+        <div class="form-grid">
+          <%- fld('recipient_name', 'ชื่อ-นามสกุล', 'text', { attrs: 'autocomplete="name" maxlength="120"' }) %>
+          <%- fld('phone', 'หมายเลขโทรศัพท์', 'tel', { attrs: 'autocomplete="tel" inputmode="tel" pattern="0[0-9]{8,9}" maxlength="12"' }) %>
+          <%- fld('address', 'ที่อยู่จัดส่ง (บ้านเลขที่ หมู่บ้าน ถนน ซอย)', 'text', { full: true, attrs: 'autocomplete="street-address" maxlength="300"' }) %>
+          <div class="field <%= errors.province ? 'has-error' : '' %>">
+            <label for="province" class="req">จังหวัด</label>
+            <select id="province" name="province" required>
+              <option value="">เลือกจังหวัด</option>
+              <% provinces.forEach(p => { %><option <%= form.province === p ? 'selected' : '' %>><%= p %></option><% }) %>
+            </select>
+            <% if (errors.province) { %><div class="err"><%= errors.province %></div><% } %>
+          </div>
+          <%- fld('district', 'เขต/อำเภอ', 'text', { attrs: 'maxlength="100"' }) %>
+          <%- fld('subdistrict', 'แขวง/ตำบล', 'text', { attrs: 'maxlength="100"' }) %>
+          <%- fld('postcode', 'รหัสไปรษณีย์', 'text', { attrs: 'inputmode="numeric" pattern="[0-9]{5}" maxlength="5" autocomplete="postal-code"' }) %>
+          <div class="field full"><label for="customer_note">หมายเหตุถึงร้าน (ไม่บังคับ)</label><textarea id="customer_note" name="customer_note" maxlength="500"><%= form.customer_note || '' %></textarea></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="card summary">
+      <h3>ตรวจสอบรายการเช่า</h3>
+      <% cart.lines.forEach(l => { %>
+        <div style="padding:8px 0;border-bottom:1px solid var(--line-2)">
+          <div class="line" style="padding:0"><span><%= l.product_name %> (<%= l.size_label %>) ×<%= l.qty %></span><span><%= baht(l.lineTotal) %></span></div>
+          <div class="small muted"><%= T.dt(l.start_at) %> → คืน <%= T.dt(l.window.dueAt) %></div>
+        </div>
+      <% }) %>
+      <div class="line"><span>ค่าเช่ารวม</span><span><%= baht(cart.subtotal) %></span></div>
+      <div class="line"><span>ค่าจัดส่ง</span><span data-ship-fee><%= form.shipping_method === 'express' ? 'ตามจริง' : baht(emsFee) %></span></div>
+      <div class="line total"><span>ยอดชำระ</span><span data-total data-subtotal="<%= cart.subtotal %>"><%= baht(cart.subtotal + (form.shipping_method === 'express' ? 0 : emsFee)) %></span></div>
+      <button class="btn block" style="margin-top:12px">ยืนยันและไปชำระเงิน</button>
+      <p class="small muted" style="margin-top:10px">เมื่อกดยืนยัน ระบบจะล็อกสต็อกไว้ให้ <%= settings.payment_hold_minutes %> นาที เพื่อให้คุณชำระเงินและอัปโหลดสลิป</p>
+    </aside>
+  </form>
+</div>
+<%- include('../partials/footer') %>

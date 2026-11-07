@@ -1,0 +1,142 @@
+/* Progressive enhancement — every page works without JS; this adds live checks & niceties. */
+(function () {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const baht = (n) => '฿' + Number(n || 0).toLocaleString('th-TH');
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // toggles (mobile menu, admin sidebar)
+    $$('[data-toggle]').forEach((b) => b.addEventListener('click', () => { const t = $(b.dataset.toggle); if (t) t.classList.toggle('open'); }));
+    $$('[data-autosubmit]').forEach((el) => el.addEventListener('change', () => el.form.submit()));
+    $$('form[data-confirm]').forEach((f) => f.addEventListener('submit', (e) => { if (!window.confirm(f.dataset.confirm)) e.preventDefault(); }));
+    $$('tr[data-href]').forEach((tr) => tr.addEventListener('click', (e) => { if (!e.target.closest('a,button,form,input,select')) location.href = tr.dataset.href; }));
+    $$('[data-open-dialog]').forEach((b) => b.addEventListener('click', () => { const d = $(b.dataset.openDialog); if (d && d.showModal) d.showModal(); }));
+    $$('[data-add-row]').forEach((b) => b.addEventListener('click', () => {
+      const tb = $(b.dataset.addRow); const last = tb && tb.lastElementChild; if (!last) return;
+      const row = last.cloneNode(true); $$('input', row).forEach((i) => { i.value = i.type === 'number' ? '1' : ''; });
+      tb.appendChild(row); const first = $('input', row); if (first) first.focus();
+    }));
+    $$('[data-close-dialog]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
+
+    // gallery
+    const g = $('[data-gallery]');
+    if (g) $$('.thumbs button', g).forEach((b) => b.addEventListener('click', () => {
+      $('[data-main]', g).src = b.dataset.src;
+      $$('.thumbs button', g).forEach((x) => x.classList.toggle('active', x === b));
+    }));
+
+    // qty steppers
+    $$('[data-qty]').forEach((q) => {
+      const input = $('input', q);
+      $$('button', q).forEach((b) => b.addEventListener('click', () => {
+        input.value = Math.max(1, Math.min(Number(input.max || 99), (parseInt(input.value, 10) || 1) + Number(b.dataset.step)));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }));
+    });
+
+    // countdown
+    $$('[data-countdown]').forEach((el) => {
+      const end = Number(el.dataset.countdown);
+      const tick = () => {
+        const s = Math.max(0, Math.floor((end - Date.now()) / 1000));
+        const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sec = s % 60;
+        el.textContent = (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+        if (s === 0) { el.textContent = 'หมดเวลา'; clearInterval(t); setTimeout(() => location.reload(), 1500); }
+      };
+      const t = setInterval(tick, 1000); tick();
+    });
+
+    // slip / image preview
+    $$('[data-dropzone]').forEach((z) => {
+      const input = $('input[type=file]', z); const img = $('img.preview', z);
+      input.addEventListener('change', () => {
+        const f = input.files[0];
+        if (f && img) { img.src = URL.createObjectURL(f); img.hidden = false; }
+      });
+    });
+
+    // checkout: live shipping fee
+    const total = $('[data-total]');
+    if (total) {
+      const upd = () => {
+        const r = $('input[name=shipping_method]:checked'); if (!r) return;
+        const fee = Number(r.dataset.fee || 0);
+        $('[data-ship-fee]').textContent = r.value === 'express' ? 'ตามจริง' : baht(fee);
+        total.textContent = baht(Number(total.dataset.subtotal) + fee);
+      };
+      $$('input[name=shipping_method]').forEach((r) => r.addEventListener('change', upd));
+    }
+
+    // product page booking box
+    const book = $('#book');
+    if (book) setupBooking(book);
+  });
+
+  function setupBooking(form) {
+    const box = $('[data-avail]');
+    const cal = $('[data-calendar]');
+    const submits = $$('[data-submit]', form);
+    const sku = () => { const r = $('input[name=sku_id]:checked', form); return r ? r.value : null; };
+    const date = $('input[name=start_date]', form);
+    const time = $('select[name=start_time]', form);
+    const days = $('select[name=days]', form);
+    const qty = $('input[name=qty]', form);
+    let calMonth = (date.value || new Date().toISOString().slice(0, 10)).slice(0, 7);
+    let seq = 0;
+
+    const setSubmit = (ok) => submits.forEach((b) => { b.disabled = !ok; });
+
+    async function check() {
+      const s = sku();
+      if (!s || !date.value) { box.className = 'avail-box'; box.textContent = 'เลือกไซส์และวันเริ่มเช่า เพื่อตรวจสอบสต็อกที่ว่าง'; setSubmit(!!s && !!date.value); return; }
+      const my = ++seq;
+      box.className = 'avail-box'; box.textContent = 'กำลังตรวจสอบ…';
+      try {
+        const r = await fetch(`/api/availability?sku=${s}&date=${date.value}&time=${encodeURIComponent(time.value)}&days=${days.value}`).then((x) => x.json());
+        if (my !== seq) return;
+        if (!r.ok) { box.className = 'avail-box bad'; box.textContent = r.error; setSubmit(false); return; }
+        const want = parseInt(qty.value, 10) || 1;
+        const enough = r.available >= want;
+        box.className = 'avail-box ' + (enough ? 'ok' : 'bad');
+        box.innerHTML = (enough ? `✓ ว่าง <strong>${r.available}</strong> ชิ้นในช่วงนี้` : (r.available ? `ว่างเพียง <strong>${r.available}</strong> ชิ้น (ต้องการ ${want})` : '✕ ไม่ว่างในช่วงเวลานี้ ลองเลือกวันอื่นจากปฏิทิน'))
+          + `<br><span class="small">เริ่ม ${r.startLabel} → <strong>คืนภายใน ${r.dueLabel}</strong> (${r.hours} ชม.)</span>`
+          + `<br><span class="small">ค่าเช่า ${baht(r.unitPrice)} × ${want} = <strong>${baht(r.unitPrice * want)}</strong></span>`;
+        const priceEl = $('[data-price]'); if (priceEl) priceEl.textContent = baht(r.unitPrice);
+        const note = $('[data-price-note]'); if (note) note.textContent = `/ ${days.value} วัน`;
+        setSubmit(enough);
+      } catch (e) { box.textContent = 'ตรวจสอบไม่สำเร็จ กรุณาลองใหม่'; }
+    }
+
+    async function renderCal() {
+      const s = sku();
+      if (!cal) return;
+      if (!s) { cal.innerHTML = '<p class="muted small">เลือกไซส์เพื่อดูปฏิทิน</p>'; return; }
+      const r = await fetch(`/api/calendar?sku=${s}&month=${calMonth}&days=${days.value}&time=${encodeURIComponent(time.value)}`).then((x) => x.json());
+      const [y, m] = r.month.split('-').map(Number);
+      const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+      const title = new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString('th-TH', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      let html = `<div class="cal-head"><button type="button" data-m="-1" aria-label="เดือนก่อน">‹</button><strong>${title}</strong><button type="button" data-m="1" aria-label="เดือนถัดไป">›</button></div><div class="cal-grid">`;
+      ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].forEach((d) => { html += `<div class="dow">${d}</div>`; });
+      for (let i = 0; i < first; i++) html += '<div></div>';
+      r.dates.forEach((d) => {
+        const n = Number(d.date.slice(8));
+        html += `<div class="day ${d.state} ${d.date === date.value ? 'selected' : ''}" data-date="${d.state === 'free' ? d.date : ''}" title="${d.state === 'free' ? 'ว่าง ' + d.available + ' ชิ้น' : d.state === 'full' ? 'เต็ม' : 'ปิดรับจอง'}">${n}${d.state === 'free' ? `<span class="n">${d.available}</span>` : ''}</div>`;
+      });
+      cal.innerHTML = html + '</div>';
+      const note = $('[data-cal-note]'); if (note) note.textContent = `เริ่ม ${r.time} น. · เช่า ${r.days} วัน`;
+      $$('[data-m]', cal).forEach((b) => b.addEventListener('click', () => {
+        const d = new Date(Date.UTC(y, m - 1 + Number(b.dataset.m), 1));
+        calMonth = d.toISOString().slice(0, 7); renderCal();
+      }));
+      $$('.day[data-date]', cal).forEach((el) => { if (el.dataset.date) el.addEventListener('click', () => { date.value = el.dataset.date; check(); renderCal(); }); });
+    }
+
+    form.addEventListener('change', (e) => {
+      if (e.target === date && date.value) calMonth = date.value.slice(0, 7);
+      check();
+      if (e.target !== qty) renderCal();
+    });
+    check(); renderCal();
+  }
+})();
