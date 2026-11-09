@@ -1,0 +1,20 @@
+<%- include('../partials/admin-header') %>
+<div class="grid-2" style="align-items:start">
+  <div class="card" style="padding:0"><table class="table">
+    <thead><tr><th>ชื่อประเภท</th><th>ลำดับ</th><th>สินค้า</th><th></th></tr></thead><tbody>
+    <% categories.forEach(c => { %><tr>
+      <td><input type="text" name="name" value="<%= c.name %>" form="cat-<%= c.id %>"></td>
+      <td style="width:90px"><input type="number" name="sort" value="<%= c.sort %>" form="cat-<%= c.id %>"></td>
+      <td><%= c.n %></td>
+      <td class="nowrap"><form id="cat-<%= c.id %>" method="post" action="/admin/categories/<%= c.id %>" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm secondary">บันทึก</button></form>
+        <form method="post" action="/admin/categories/<%= c.id %>" class="inline-form" data-confirm="ลบประเภทนี้? สินค้าจะเป็น 'ไม่ระบุประเภท'"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="_action" value="delete"><button class="btn sm danger">ลบ</button></form></td>
+    </tr><% }) %>
+  </tbody></table></div>
+  <form class="card" method="post" action="/admin/categories"><input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h3>เพิ่มประเภทสินค้า</h3>
+    <div class="field"><label class="req">ชื่อ</label><input type="text" name="name" required maxlength="60" placeholder="เช่น ชุดราตรี"></div>
+    <div class="field"><label>ลำดับการแสดง</label><input type="number" name="sort" value="0"></div>
+    <button class="btn">เพิ่ม</button>
+  </form>
+</div>
+<%- include('../partials/admin-footer') %>

@@ -1,0 +1,24 @@
+<%- include('../partials/admin-header', { topActions: '<a class="btn sm" href="/admin/products/new">+ เพิ่มสินค้า</a>' }) %>
+<form method="get" class="toolbar"><div class="field grow"><input type="search" name="q" value="<%= query.q || '' %>" placeholder="ค้นหาชื่อสินค้า / ประเภท"></div><button class="btn sm secondary">ค้นหา</button></form>
+<div class="card" style="padding:0"><div class="table-wrap"><table class="table">
+  <thead><tr><th></th><th>สินค้า</th><th>ประเภท</th><th>ราคาเช่า</th><th>ไซส์ : สต็อก</th><th>หน้าร้าน</th><th></th></tr></thead>
+  <tbody>
+  <% if (!products.length) { %><tr><td colspan="7" class="center muted" style="padding:40px">ยังไม่มีสินค้า — <a class="link" href="/admin/products/new">เพิ่มสินค้าแรก</a></td></tr><% } %>
+  <% products.forEach(p => { %>
+    <tr>
+      <td><img class="thumb" src="<%= h.img(p.image) %>" alt=""></td>
+      <td><a class="link" href="/admin/products/<%= p.id %>"><strong><%= p.name %></strong></a><div class="small muted">ID <%= p.id %> · อัปเดต <%= T.date(p.updated_at) %></div></td>
+      <td><%= p.category_name || '-' %></td>
+      <td class="nowrap"><%= baht(p.base_price) %> / <%= p.base_days %> วัน<% if (p.extra_day_price) { %><div class="small muted">+<%= baht(p.extra_day_price) %>/วัน</div><% } %></td>
+      <td class="small"><%= p.sizes || '-' %><div class="muted">รวม <%= p.stock %> ตัว</div></td>
+      <td>
+        <form method="post" action="/admin/products/<%= p.id %>/toggle"><input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="badge <%= p.is_active ? 'ok' : 'muted' %>" style="border:0;cursor:pointer"><%= p.is_active ? 'แสดง' : 'ซ่อน' %></button>
+        </form>
+      </td>
+      <td class="right nowrap"><a class="btn sm secondary" href="/admin/products/<%= p.id %>/calendar">ปฏิทิน</a> <a class="btn sm secondary" href="/admin/products/<%= p.id %>">แก้ไข</a></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table></div></div>
+<%- include('../partials/admin-footer') %>

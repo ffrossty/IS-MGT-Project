@@ -1,0 +1,91 @@
+<%- include('../partials/header') %>
+<%
+  const flow = ['awaiting_payment','pending_approval','confirmed','returned','completed'];
+  const idx = flow.indexOf(o.status);
+  const shipIdx = L.SHIPPING_ORDER.indexOf(o.shipping_status);
+%>
+<div class="container" style="padding-top:30px">
+  <div class="row between">
+    <div>
+      <div class="small muted">คำสั่งซื้อ</div>
+      <h1 class="mono" style="font-family:var(--font);font-weight:600;margin:0"><%= o.code %></h1>
+      <div class="small muted">สั่งจองเมื่อ <%= T.dt(o.created_at) %></div>
+    </div>
+    <div class="row"><%- h.orderBadge(o.status) %> <%- h.paymentBadge(o.payment_status) %></div>
+  </div>
+
+  <% if (o.status === 'awaiting_payment') { %>
+    <div class="flash warn row between">
+      <span><%= o.payment_status === 'rejected' ? `สลิปไม่ผ่านการตรวจสอบ: ${o.reject_reason || ''} — กรุณาอัปโหลดสลิปใหม่` : 'รอการชำระเงิน' %> ภายใน <strong><%= T.dt(o.hold_expires_at) %></strong></span>
+      <a class="btn sm accent" href="/orders/<%= o.code %>/pay">ชำระเงิน / อัปโหลดสลิป</a>
+    </div>
+  <% } else if (o.status === 'pending_approval') { %>
+    <div class="flash info">ได้รับสลิปแล้ว ระบบล็อกสต็อกไว้ให้คุณแล้ว — แอดมินกำลังตรวจสอบการชำระเงิน คุณจะได้รับแจ้งเตือนทาง LINE เมื่อยืนยัน</div>
+  <% } else if (o.status === 'rejected' || o.status === 'cancelled') { %>
+    <div class="flash error">คำสั่งจองนี้<%= L.ORDER_STATUS[o.status].th %><%= o.reject_reason ? ` — เหตุผล: ${o.reject_reason}` : '' %></div>
+  <% } else if (o.status === 'expired') { %>
+    <div class="flash error">หมดเวลาชำระเงิน สต็อกถูกคืนเข้าระบบแล้ว กรุณาทำรายการจองใหม่</div>
+  <% } %>
+
+  <div class="grid-2 wide-left" style="align-items:start;margin-top:20px">
+    <div class="stack">
+      <div class="card">
+        <h3>รายการเช่า</h3>
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>สินค้า</th><th>เริ่มเช่า</th><th>กำหนดคืน</th><th class="right">ราคา</th></tr></thead>
+          <tbody>
+          <% items.forEach(i => { %>
+            <tr>
+              <td><a class="link" href="/products/<%= i.product_id %>"><%= i.product_name %></a><div class="small muted">ไซส์ <%= i.size_label %> × <%= i.qty %></div></td>
+              <td class="nowrap"><%= T.dt(i.start_at) %></td>
+              <td class="nowrap"><strong><%= T.dt(i.due_at) %></strong><div class="small muted"><%= i.days %> วัน · <%= i.days*24 %> ชม.</div></td>
+              <td class="right"><%= baht(i.line_total) %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table></div>
+        <div class="summary" style="position:static;max-width:320px;margin-left:auto">
+          <div class="line"><span>ค่าเช่า</span><span><%= baht(o.subtotal) %></span></div>
+          <div class="line"><span>ค่าจัดส่ง</span><span><%= o.shipping_method === 'express' ? 'ตามจริง (ชำระกับผู้ขนส่ง)' : baht(o.shipping_fee) %></span></div>
+          <div class="line total"><span>ยอดชำระ</span><span><%= baht(o.total) %></span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><h3>การจัดส่ง</h3><%- h.shippingBadge(o.shipping_status) %></div>
+        <div class="track-steps">
+          <% L.SHIPPING_ORDER.forEach((s, i) => { %><div class="<%= shipIdx >= i ? 'on' : '' %>"><%= L.SHIPPING_STATUS[s].th %></div><% }) %>
+        </div>
+        <dl class="kv" style="margin-top:14px">
+          <dt>วิธีจัดส่ง</dt><dd><%= L.SHIPPING_METHOD[o.shipping_method] %><%= o.express_provider ? ` · ${o.express_provider}` : '' %></dd>
+          <% if (o.tracking_number) { %><dt>Tracking</dt><dd class="mono"><%= o.tracking_number %>
+            <% if (o.shipping_method === 'ems') { %> · <a class="link" target="_blank" rel="noopener" href="https://track.thailandpost.co.th/?trackNumber=<%= encodeURIComponent(o.tracking_number) %>">ตรวจสอบพัสดุ</a><% } %></dd><% } %>
+          <% if (o.express_info) { %><dt>รายละเอียด</dt><dd><%= o.express_info %></dd><% } %>
+          <% if (o.shipped_at) { %><dt>วันที่จัดส่ง</dt><dd><%= T.dt(o.shipped_at) %></dd><% } %>
+          <% if (o.delivered_at) { %><dt>ส่งถึงเมื่อ</dt><dd><%= T.dt(o.delivered_at) %></dd><% } %>
+          <% if (o.shipping_note) { %><dt>หมายเหตุจากร้าน</dt><dd><%= o.shipping_note %></dd><% } %>
+          <dt>ผู้รับ</dt><dd><%= o.recipient_name %> · <%= o.phone %><br><span class="muted"><%= o.address %> <%= o.subdistrict %> <%= o.district %> <%= o.province %> <%= o.postcode %></span></dd>
+        </dl>
+      </div>
+    </div>
+
+    <aside class="card">
+      <h3>ความคืบหน้า</h3>
+      <ul class="timeline">
+        <% events.forEach((e, i) => { %>
+          <li class="<%= i === events.length - 1 ? 'current' : 'done' %>"><div><%= e.message %></div><div class="t"><%= T.dt(e.created_at) %></div></li>
+        <% }) %>
+      </ul>
+      <% if (o.status === 'awaiting_payment') { %>
+        <form method="post" action="/orders/<%= o.code %>/cancel" data-confirm="ยืนยันการยกเลิกคำสั่งจองนี้?">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="btn danger sm">ยกเลิกคำสั่งจอง</button>
+        </form>
+      <% } %>
+      <% if (o.status === 'confirmed' && user.is_friend === 0 && config.oaBasicId) { %>
+        <p class="small muted">เพิ่มเพื่อน <a class="link" href="https://line.me/R/ti/p/<%= encodeURIComponent(config.oaBasicId) %>"><%= config.oaBasicId %></a> เพื่อรับแจ้งเตือนการจัดส่ง</p>
+      <% } %>
+    </aside>
+  </div>
+</div>
+<%- include('../partials/footer') %>

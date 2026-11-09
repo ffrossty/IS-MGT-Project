@@ -1,0 +1,63 @@
+<%- include('../partials/header') %>
+<div class="container">
+  <%- include('../partials/steps', { step: 0 }) %>
+  <h1>ตะกร้าสินค้า</h1>
+  <% if (!cart.lines.length) { %>
+    <div class="empty"><h3>ยังไม่มีสินค้าในตะกร้า</h3><p>เลือกชุดที่ชอบ แล้วเพิ่มลงตะกร้าได้หลายรายการ</p><a class="btn" href="/">เลือกชุด</a></div>
+  <% } else { %>
+  <div class="grid-2 wide-left" style="align-items:start">
+    <div>
+      <% cart.lines.forEach(l => { %>
+        <div class="cart-line">
+          <a href="/products/<%= l.product_id %>"><img src="<%= h.img(l.image) %>" alt=""></a>
+          <div>
+            <div class="row between" style="align-items:flex-start">
+              <div>
+                <div style="font-family:var(--serif-th);font-size:1.05rem"><%= l.product_name %></div>
+                <div class="small muted">ไซส์ <%= l.size_label %> · <%= baht(l.unitPrice) %> × <%= l.qty %></div>
+              </div>
+              <div style="font-weight:600"><%= baht(l.lineTotal) %></div>
+            </div>
+            <div class="small" style="margin-top:6px">
+              เริ่ม <strong><%= T.dt(l.start_at) %></strong> → คืนภายใน <strong><%= T.dt(l.window.dueAt) %></strong>
+              <span class="muted">(<%= l.days %> วัน / <%= l.window.hours %> ชม.)</span>
+            </div>
+            <% if (l.error) { %><div class="flash error" style="margin:8px 0 0;padding:8px 12px"><%= l.error %></div><% } else { %><div class="small" style="color:var(--ok);margin-top:4px">✓ ว่าง <%= l.available %> ชิ้นในช่วงเวลานี้</div><% } %>
+            <form method="post" action="/cart/<%= l.id %>/update" class="edit">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <div class="field"><label>วันเริ่ม</label><input type="date" name="start_date" value="<%= T.toInputDate(l.start_at) %>" required></div>
+              <div class="field"><label>เวลา</label><select name="start_time">
+                <% const tt = T.toInputTime(l.start_at); const opts = timeOptions.includes(tt) ? timeOptions : [tt, ...timeOptions]; opts.forEach(t => { %><option <%= t===tt?'selected':'' %>><%= t %></option><% }) %>
+              </select></div>
+              <div class="field"><label>ระยะเวลา</label><select name="days">
+                <% durations.forEach(d => { %><option value="<%= d %>" <%= d===l.days?'selected':'' %>><%= d %> วัน</option><% }) %>
+                <% if (!durations.includes(l.days)) { %><option value="<%= l.days %>" selected><%= l.days %> วัน</option><% } %>
+              </select></div>
+              <div class="field"><label>จำนวน</label><input type="number" name="qty" min="1" max="20" value="<%= l.qty %>"></div>
+              <button class="btn secondary sm">อัปเดต</button>
+            </form>
+            <form method="post" action="/cart/<%= l.id %>/remove" style="margin-top:6px">
+              <input type="hidden" name="_csrf" value="<%= csrf %>">
+              <button class="btn ghost sm" style="padding-left:0;color:var(--bad)">ลบออกจากตะกร้า</button>
+            </form>
+          </div>
+        </div>
+      <% }) %>
+      <a class="link small" href="/" style="display:inline-block;margin-top:16px">+ เลือกชุดอื่นเพิ่มเติม</a>
+    </div>
+    <aside class="card summary">
+      <h3>สรุปรายการ</h3>
+      <% cart.lines.forEach(l => { %><div class="line small"><span><%= l.product_name %> (<%= l.size_label %>) ×<%= l.qty %></span><span><%= baht(l.lineTotal) %></span></div><% }) %>
+      <div class="line total"><span>ค่าเช่ารวม</span><span><%= baht(cart.subtotal) %></span></div>
+      <p class="small muted">ค่าจัดส่งคำนวณในขั้นตอนถัดไป</p>
+      <% if (cart.ok) { %>
+        <a class="btn block" href="/checkout">ยืนยันช่วงเวลาเช่า & ไปขั้นตอนจัดส่ง</a>
+      <% } else { %>
+        <button class="btn block" disabled>มีรายการที่จองไม่ได้</button>
+        <p class="small" style="color:var(--bad);margin-top:8px">กรุณาแก้ไขวันที่/จำนวน หรือลบรายการที่ไม่ว่างออกก่อน</p>
+      <% } %>
+    </aside>
+  </div>
+  <% } %>
+</div>
+<%- include('../partials/footer') %>

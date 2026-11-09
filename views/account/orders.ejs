@@ -1,0 +1,28 @@
+<%- include('../partials/header') %>
+<div class="container" style="padding-top:30px">
+  <h1>คำสั่งจองของฉัน</h1>
+  <% if (!orders.length) { %>
+    <div class="empty"><h3>ยังไม่มีคำสั่งจอง</h3><a class="btn" href="/">เลือกชุด</a></div>
+  <% } else { %>
+  <div class="card" style="padding:0"><div class="table-wrap"><table class="table">
+    <thead><tr><th>Order ID</th><th>วันที่สั่งจอง</th><th>เริ่มเช่า</th><th>ยอดชำระ</th><th>สถานะ</th><th>จัดส่ง</th><th></th></tr></thead>
+    <tbody>
+    <% orders.forEach(o => { %>
+      <tr class="clickable" data-href="/orders/<%= o.code %>">
+        <td class="mono"><%= o.code %><div class="small muted"><%= o.item_count %> รายการ</div></td>
+        <td class="nowrap"><%= T.dt(o.created_at) %></td>
+        <td class="nowrap"><%= T.dt(o.first_start) %></td>
+        <td><%= baht(o.total) %></td>
+        <td><%- h.orderBadge(o.status) %></td>
+        <td><%- h.shippingBadge(o.shipping_status) %></td>
+        <td class="right">
+          <% if (o.status === 'awaiting_payment') { %><a class="btn sm accent" href="/orders/<%= o.code %>/pay">ชำระเงิน</a>
+          <% } else { %><a class="btn sm secondary" href="/orders/<%= o.code %>">ดูสถานะ</a><% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table></div></div>
+  <% } %>
+</div>
+<%- include('../partials/footer') %>

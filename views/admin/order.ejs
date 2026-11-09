@@ -1,0 +1,166 @@
+<%- include('../partials/admin-header') %>
+<% const editable = ['awaiting_payment','pending_approval','confirmed'].includes(o.status); %>
+<div class="row between" style="margin-bottom:16px">
+  <div>
+    <div class="mono" style="font-size:1.3rem;font-weight:600"><%= o.code %></div>
+    <div class="small muted">สั่งจองเมื่อ <%= T.dt(o.created_at) %> · อัปเดตล่าสุด <%= T.dt(o.updated_at) %></div>
+  </div>
+  <div class="row"><%- h.orderBadge(o.status) %> <%- h.paymentBadge(o.payment_status) %> <%- h.shippingBadge(o.shipping_status) %></div>
+</div>
+<% if (o.status === 'awaiting_payment') { %><div class="flash warn">รอลูกค้าชำระเงิน — สต็อกถูกล็อกถึง <strong><%= T.dt(o.hold_expires_at) %></strong> หลังจากนั้นระบบจะปลดล็อกอัตโนมัติ</div><% } %>
+<% if (o.status === 'pending_approval') { %><div class="flash <%= o.review_overdue ? 'error' : 'info' %>">ลูกค้าส่งสลิปแล้ว — ควรตรวจสอบภายใน <strong><%= T.dt(o.review_due_at) %></strong><%= o.review_overdue ? ' (เกินเวลาแล้ว)' : '' %> · สต็อกยังถูกล็อกไว้</div><% } %>
+<% if (o.reject_reason && ['rejected','cancelled','awaiting_payment'].includes(o.status)) { %><div class="flash error">เหตุผล: <%= o.reject_reason %></div><% } %>
+
+<div class="grid-2 wide-left" style="align-items:start">
+  <div class="stack">
+    <div class="card">
+      <div class="card-title"><h3>การดำเนินการ</h3></div>
+      <div class="actions">
+        <% if (o.status === 'pending_approval') { %>
+          <form method="post" action="/admin/orders/<%= o.code %>/approve" data-confirm="ยืนยันว่าตรวจสอบสลิปและยอดเงิน <%= baht(o.total) %> ถูกต้องแล้ว?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ok">✓ ยืนยันการชำระเงิน & คำสั่งจอง</button></form>
+          <button class="btn secondary" data-open-dialog="#dlg-slip">สลิปไม่ถูกต้อง ขอสลิปใหม่</button>
+        <% } %>
+        <% if (['awaiting_payment','pending_approval'].includes(o.status)) { %><button class="btn danger" data-open-dialog="#dlg-reject">ปฏิเสธคำสั่งจอง</button><% } %>
+        <% if (o.status === 'confirmed') { %>
+          <form method="post" action="/admin/orders/<%= o.code %>/returned" data-confirm="บันทึกว่าได้รับชุดคืนแล้ว?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn">บันทึกรับคืนชุด</button></form>
+        <% } %>
+        <% if (o.status === 'returned') { %>
+          <form method="post" action="/admin/orders/<%= o.code %>/completed"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ok">ตรวจสอบ/ทำความสะอาดเสร็จ → เสร็จสิ้น</button></form>
+        <% } %>
+        <% if (['awaiting_payment','pending_approval','confirmed'].includes(o.status)) { %><button class="btn danger" data-open-dialog="#dlg-cancel">ยกเลิกคำสั่งซื้อ</button><% } %>
+        <% if (['rejected','cancelled','expired','completed'].includes(o.status)) { %><span class="muted small">คำสั่งซื้อนี้สิ้นสุดแล้ว — สต็อกถูกคืนเข้าระบบ</span><% } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>รายการสินค้า & ระยะเวลาเช่า</h3>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>สินค้า</th><th>เริ่มเช่า</th><th>กำหนดคืน</th><th>ล็อกสต็อก</th><th class="right">ราคา</th></tr></thead>
+        <tbody>
+        <% items.forEach(i => { %>
+          <tr>
+            <td><a class="link" href="/admin/products/<%= i.product_id %>/calendar"><%= i.product_name %></a><div class="small">ไซส์ <strong><%= i.size_label %></strong> × <%= i.qty %></div></td>
+            <td class="nowrap small"><%= T.dt(i.start_at) %></td>
+            <td class="nowrap small"><strong><%= T.dt(i.due_at) %></strong><div class="muted"><%= i.days %> วัน (<%= i.days*24 %> ชม.)</div></td>
+            <td class="nowrap small muted"><%= T.dt(i.block_start) %><br><%= T.dt(i.block_end) %></td>
+            <td class="right nowrap"><%= baht(i.unit_price) %> × <%= i.qty %><div><strong><%= baht(i.line_total) %></strong></div></td>
+          </tr>
+          <% if (editable) { %>
+          <tr><td colspan="5" style="padding-top:0">
+            <details><summary class="small link" style="cursor:pointer">แก้ไขการจองรายการนี้</summary>
+              <form method="post" action="/admin/orders/<%= o.code %>/items/<%= i.id %>" class="row" style="margin-top:8px;align-items:end">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <div class="field" style="margin:0"><label>เริ่มเช่า</label><input type="datetime-local" name="start" value="<%= T.toInputDateTime(i.start_at) %>" required></div>
+                <div class="field" style="margin:0"><label>วัน</label><input type="number" name="days" value="<%= i.days %>" min="1" style="width:80px"></div>
+                <div class="field" style="margin:0"><label>จำนวน</label><input type="number" name="qty" value="<%= i.qty %>" min="1" style="width:80px"></div>
+                <button class="btn sm secondary">บันทึก (ตรวจสต็อกใหม่)</button>
+              </form>
+            </details>
+          </td></tr>
+          <% } %>
+        <% }) %>
+        </tbody>
+      </table></div>
+      <div class="summary" style="position:static;max-width:320px;margin-left:auto">
+        <div class="line"><span>ค่าเช่า</span><span><%= baht(o.subtotal) %></span></div>
+        <div class="line"><span>ค่าจัดส่ง</span><span><%= o.shipping_method === 'express' ? 'ตามจริง (ลูกค้าจ่ายผู้ขนส่ง)' : baht(o.shipping_fee) %></span></div>
+        <div class="line total"><span>ยอดที่ลูกค้าต้องโอน</span><span><%= baht(o.total) %></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><h3>การจัดส่ง</h3><%- h.shippingBadge(o.shipping_status) %></div>
+      <% if (['confirmed','returned','completed'].includes(o.status)) { %>
+      <form method="post" action="/admin/orders/<%= o.code %>/shipping">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div class="form-grid">
+          <div class="field"><label>วิธีจัดส่ง</label><select name="shipping_method"><% Object.entries(L.SHIPPING_METHOD).forEach(([k, v]) => { %><option value="<%= k %>" <%= o.shipping_method === k ? 'selected' : '' %>><%= v %></option><% }) %></select></div>
+          <div class="field"><label>สถานะการจัดส่ง</label><select name="shipping_status"><% L.SHIPPING_ORDER.forEach(k => { %><option value="<%= k %>" <%= (o.shipping_status || 'preparing') === k ? 'selected' : '' %>><%= L.SHIPPING_STATUS[k].en %> — <%= L.SHIPPING_STATUS[k].th %></option><% }) %></select></div>
+          <div class="field"><label>Tracking Number (EMS)</label><input type="text" name="tracking_number" value="<%= o.tracking_number || '' %>" placeholder="เช่น EF123456789TH" class="mono"></div>
+          <div class="field"><label>วันที่จัดส่ง</label><input type="datetime-local" name="shipped_at" value="<%= o.shipped_at ? T.toInputDateTime(o.shipped_at) : '' %>"></div>
+          <div class="field"><label>ผู้ให้บริการด่วน (Express)</label><input type="text" name="express_provider" value="<%= o.express_provider || '' %>" placeholder="Grab / Lalamove"></div>
+          <div class="field"><label>ข้อมูลการจัดส่งด่วน</label><input type="text" name="express_info" value="<%= o.express_info || '' %>" placeholder="ชื่อคนขับ / ทะเบียน / ลิงก์ติดตาม"></div>
+          <div class="field full"><label>หมายเหตุถึงลูกค้า (แสดงในหน้าติดตามสถานะ)</label><input type="text" name="shipping_note" value="<%= o.shipping_note || '' %>"></div>
+        </div>
+        <button class="btn">บันทึกการจัดส่ง</button>
+        <span class="small muted" style="margin-left:8px">เมื่อเปลี่ยนเป็น “Shipped” ครั้งแรก ระบบจะส่ง LINE แจ้งลูกค้า</span>
+      </form>
+      <% } else { %><p class="muted small">จัดการการจัดส่งได้หลังยืนยันคำสั่งจอง · วิธีที่ลูกค้าเลือก: <strong><%= L.SHIPPING_METHOD[o.shipping_method] %></strong></p><% } %>
+    </div>
+
+    <div class="card">
+      <h3>ประวัติการเปลี่ยนแปลง</h3>
+      <ul class="event-list">
+        <% events.forEach(e => { %>
+          <li><div><%= e.message %></div><div class="small muted"><%= T.dt(e.created_at) %> · <%= e.actor_role === 'system' ? 'ระบบ' : (e.display_name || '-') + ' (' + e.actor_role + ')' %></div>
+            <% if (e.data && e.type !== 'slip_uploaded') { %><details><summary class="small link" style="cursor:pointer">รายละเอียด</summary><pre class="code-box" style="white-space:pre-wrap"><%= JSON.stringify(JSON.parse(e.data), null, 1) %></pre></details><% } %></li>
+        <% }) %>
+      </ul>
+      <form method="post" action="/admin/orders/<%= o.code %>/note" class="row" style="margin-top:10px"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="text" name="note" placeholder="บันทึกภายใน (ลูกค้าไม่เห็น)" style="flex:1"><button class="btn sm secondary">บันทึก</button></form>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <h3>หลักฐานการชำระเงิน</h3>
+      <% if (o.slip_filename) { %>
+        <a href="/slips/<%= o.slip_filename %>" target="_blank"><img class="slip-img" src="/slips/<%= o.slip_filename %>" alt="สลิป"></a>
+        <div class="small muted center" style="margin-top:6px">อัปโหลดเมื่อ <%= T.dt(o.slip_uploaded_at) %> · ยอดที่ต้องได้รับ <strong><%= baht(o.total) %></strong></div>
+        <% if (slips.length > 1) { %><div class="small" style="margin-top:8px">สลิปก่อนหน้า: <% slips.filter(s => s !== o.slip_filename).forEach((s, i) => { %><a class="link" target="_blank" href="/slips/<%= s %>">#<%= i+1 %></a> <% }) %></div><% } %>
+      <% } else { %><p class="muted small">ยังไม่มีสลิป</p><% } %>
+    </div>
+
+    <div class="card">
+      <h3>ลูกค้า & ผู้รับ</h3>
+      <dl class="kv">
+        <dt>บัญชี LINE</dt><dd><%= customer.display_name %><div class="small muted mono"><%= customer.line_user_id %></div></dd>
+        <dt>ผู้รับ</dt><dd><%= o.recipient_name %></dd>
+        <dt>โทร</dt><dd><a class="link" href="tel:<%= o.phone %>"><%= o.phone %></a></dd>
+        <dt>ที่อยู่</dt><dd><%= o.address %><br><%= o.subdistrict %> <%= o.district %><br><%= o.province %> <%= o.postcode %></dd>
+        <% if (o.customer_note) { %><dt>หมายเหตุ</dt><dd><%= o.customer_note %></dd><% } %>
+      </dl>
+      <details style="margin-top:10px"><summary class="small link" style="cursor:pointer">แก้ไขข้อมูลผู้รับ</summary>
+        <form method="post" action="/admin/orders/<%= o.code %>/contact" style="margin-top:10px"><input type="hidden" name="_csrf" value="<%= csrf %>">
+          <% [['recipient_name','ชื่อ-นามสกุล'],['phone','โทร'],['address','ที่อยู่'],['subdistrict','แขวง/ตำบล'],['district','เขต/อำเภอ'],['province','จังหวัด'],['postcode','รหัสไปรษณีย์']].forEach(([k, lab]) => { %>
+            <div class="field"><label><%= lab %></label><input type="text" name="<%= k %>" value="<%= o[k] %>" required></div>
+          <% }) %>
+          <button class="btn sm">บันทึก</button>
+        </form>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3>LINE Notification</h3>
+      <% if (!notifications.length) { %><p class="muted small">ยังไม่มีการส่ง (ระบบส่งเมื่อยืนยันคำสั่งจอง และเมื่อจัดส่งแล้ว)</p><% } %>
+      <ul class="event-list">
+        <% notifications.forEach(n => { %><li><span class="badge <%= n.status === 'sent' ? 'ok' : n.status === 'failed' ? 'bad' : 'muted' %>"><%= n.status %></span> <%= n.type === 'booking_confirmed' ? 'ยืนยันการจอง' : 'แจ้งจัดส่ง' %> <span class="small muted">· <%= T.dt(n.created_at) %></span><% if (n.error) { %><div class="small muted"><%= n.error %></div><% } %></li><% }) %>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Google Sheets</h3>
+      <% if (sync) { %><p class="small"><span class="badge <%= sync.status === 'synced' && !sync.dirty ? 'ok' : sync.status === 'failed' ? 'bad' : 'muted' %>"><%= sync.status %></span>
+        <%= sync.row_number ? ` แถวที่ ${sync.row_number}` : '' %> <%= sync.synced_at ? '· ' + T.dt(sync.synced_at) : '' %></p>
+        <% if (sync.last_error) { %><div class="small muted"><%= sync.last_error %></div><% } %>
+      <% } %>
+      <% if (sheetUrl) { %><a class="link small" target="_blank" rel="noopener" href="<%= sheetUrl %>">เปิด Google Sheets ↗</a><% } %>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlg-reject"><form method="post" action="/admin/orders/<%= o.code %>/reject"><input type="hidden" name="_csrf" value="<%= csrf %>">
+  <h3>ปฏิเสธคำสั่งจอง</h3><p class="small muted">ระบบจะคืนสต็อกที่ล็อกไว้ และแสดงเหตุผลให้ลูกค้าเห็นบนเว็บไซต์</p>
+  <div class="field"><label class="req">เหตุผล</label><textarea name="reason" required></textarea></div>
+  <div class="row"><button class="btn danger">ปฏิเสธ</button><button type="button" class="btn ghost" data-close-dialog>ปิด</button></div>
+</form></dialog>
+<dialog id="dlg-slip"><form method="post" action="/admin/orders/<%= o.code %>/request-slip"><input type="hidden" name="_csrf" value="<%= csrf %>">
+  <h3>ขอสลิปใหม่</h3><p class="small muted">สถานะจะกลับเป็น “รอชำระเงิน” และยังคงล็อกสต็อกไว้ให้ลูกค้าอัปโหลดสลิปใหม่</p>
+  <div class="field"><label class="req">เหตุผล</label><textarea name="reason" required placeholder="เช่น ยอดเงินไม่ตรง / รูปไม่ชัด"></textarea></div>
+  <div class="row"><button class="btn">ส่งคำขอ</button><button type="button" class="btn ghost" data-close-dialog>ปิด</button></div>
+</form></dialog>
+<dialog id="dlg-cancel"><form method="post" action="/admin/orders/<%= o.code %>/cancel"><input type="hidden" name="_csrf" value="<%= csrf %>">
+  <h3>ยกเลิกคำสั่งซื้อ</h3><p class="small muted">สต็อกจะถูกคืนเข้าระบบทันที<%= o.payment_status === 'approved' ? ' — คำสั่งซื้อนี้ชำระเงินแล้ว อย่าลืมดำเนินการคืนเงินนอกระบบ' : '' %></p>
+  <div class="field"><label>เหตุผล</label><textarea name="reason"></textarea></div>
+  <div class="row"><button class="btn danger">ยืนยันยกเลิก</button><button type="button" class="btn ghost" data-close-dialog>ปิด</button></div>
+</form></dialog>
+<%- include('../partials/admin-footer') %>

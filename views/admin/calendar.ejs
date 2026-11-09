@@ -1,0 +1,24 @@
+<%- include('../partials/admin-header') %>
+<div class="toolbar">
+  <a class="btn secondary sm" href="?month=<%= prev %>&product=<%= productId || '' %>">‹</a>
+  <h2 style="margin:0 8px"><%= monthLabel %></h2>
+  <a class="btn secondary sm" href="?month=<%= next %>&product=<%= productId || '' %>">›</a>
+  <form method="get" class="row" style="margin-left:auto">
+    <input type="hidden" name="month" value="<%= y %>-<%= String(mo).padStart(2,'0') %>">
+    <select name="product" data-autosubmit style="width:auto"><option value="">ทุกสินค้า</option><% products.forEach(p => { %><option value="<%= p.id %>" <%= productId === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %></select>
+  </form>
+</div>
+<div class="cal-legend" style="margin-bottom:10px"><span><span class="ev out" style="display:inline">↗ เริ่มเช่า</span></span><span><span class="ev in" style="display:inline">↙ กำหนดคืน</span></span><span><span class="ev blk" style="display:inline">ปิดชั่วคราว</span></span><span><span class="ev hold" style="display:inline">รอยืนยัน/รอชำระ</span></span></div>
+<div class="table-wrap"><div class="month-cal" style="min-width:760px">
+  <% ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'].forEach(d => { %><div class="h"><%= d %></div><% }) %>
+  <% for (let i = 0; i < days[0].dow; i++) { %><div class="c" style="background:#fcfbf9"></div><% } %>
+  <% const today = T.toInputDate(Date.now()); days.forEach(d => { const pending = (s) => ['awaiting_payment','pending_approval'].includes(s); %>
+    <div class="c <%= T.toInputDate(d.ds) === today ? 'today' : '' %>">
+      <div class="d"><%= d.d %> <% if (d.active) { %><span><%= d.active %> ชิ้นถูกเช่า</span><% } %></div>
+      <% d.starts.forEach(i => { %><a class="ev <%= pending(i.status) ? 'hold' : 'out' %>" href="/admin/orders/<%= i.code %>" title="<%= i.product_name %> (<%= i.size_label %>) ×<%= i.qty %> · <%= T.time(i.start_at) %> · <%= i.recipient_name %>">↗ <%= T.time(i.start_at).replace(' น.','') %> <%= i.product_name %> (<%= i.size_label %>)</a><% }) %>
+      <% d.dues.forEach(i => { %><a class="ev <%= pending(i.status) ? 'hold' : 'in' %>" href="/admin/orders/<%= i.code %>" title="คืน <%= i.product_name %> · <%= T.time(i.due_at) %>">↙ <%= T.time(i.due_at).replace(' น.','') %> <%= i.product_name %> (<%= i.size_label %>)</a><% }) %>
+      <% d.blocks.forEach(b => { %><span class="ev blk" title="<%= b.note || '' %>"><%= L.BLOCK_REASON[b.reason] %>: <%= b.product_name %> (<%= b.size_label %>) ×<%= b.qty %></span><% }) %>
+    </div>
+  <% }) %>
+</div></div>
+<%- include('../partials/admin-footer') %>

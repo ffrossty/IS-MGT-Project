@@ -1,0 +1,49 @@
+<%- include('../partials/header') %>
+<div class="container">
+  <%- include('../partials/steps', { step: 2 }) %>
+  <div class="grid-2" style="align-items:start">
+    <div class="card pad-lg pay-qr">
+      <div class="small muted">ยอดที่ต้องชำระ · <span class="mono"><%= o.code %></span></div>
+      <div class="amount"><%= baht(o.total) %></div>
+      <% if (o.shipping_method === 'express') { %><div class="small muted">ไม่รวมค่าส่ง Express (ชำระกับผู้ให้บริการขนส่งตามจริง)</div><% } %>
+      <div style="margin:18px 0">
+        <% if (hasPromptPay) { %>
+          <img src="/orders/<%= o.code %>/qr.png" alt="PromptPay QR">
+          <div class="small" style="margin-top:8px">สแกนด้วย Mobile Banking — QR นี้ระบุยอด <strong><%= baht(o.total) %></strong> ไว้แล้ว</div>
+          <% if (settings.promptpay_name) { %><div class="small muted">ชื่อบัญชี: <%= settings.promptpay_name %></div><% } %>
+        <% } else if (qrImage) { %>
+          <img src="/media/settings/<%= qrImage %>" alt="QR ชำระเงิน">
+          <div class="small" style="margin-top:8px">กรุณาโอนยอด <strong><%= baht(o.total) %></strong> ให้ตรงตามจำนวน</div>
+        <% } else { %>
+          <div class="flash warn">ร้านยังไม่ได้ตั้งค่า QR Code รับชำระเงิน (Admin › ตั้งค่าร้าน) กรุณาติดต่อร้าน</div>
+        <% } %>
+      </div>
+      <div class="small">ระบบล็อกสต็อกให้ถึง <strong><%= T.dt(o.hold_expires_at) %></strong></div>
+      <div class="small">เหลือเวลา <span class="countdown" data-countdown="<%= o.hold_expires_at %>">--:--</span></div>
+    </div>
+
+    <div class="card pad-lg">
+      <h2>อัปโหลดสลิปการโอนเงิน</h2>
+      <% if (o.payment_status === 'rejected') { %><div class="flash error">สลิปก่อนหน้าไม่ผ่าน: <%= o.reject_reason %></div><% } %>
+      <form method="post" action="/orders/<%= o.code %>/slip?_csrf=<%= csrf %>" enctype="multipart/form-data">
+        <label class="dropzone" data-dropzone>
+          <input type="file" name="slip" accept="image/jpeg,image/png,image/webp" required>
+          <div><strong>แตะเพื่อเลือกรูปสลิป</strong><div class="small muted">JPG / PNG ขนาดไม่เกิน 8MB</div></div>
+          <img class="preview" alt="" hidden>
+        </label>
+        <button class="btn block" style="margin-top:14px">ส่งสลิปและยืนยันคำสั่งจอง</button>
+      </form>
+      <p class="small muted" style="margin-top:12px">แอดมินจะตรวจสอบสลิปและยอดเงินด้วยตนเอง สถานะจะยังไม่เป็น "ชำระเงินสำเร็จ" จนกว่าแอดมินยืนยัน</p>
+      <hr>
+      <h3>รายการ</h3>
+      <% items.forEach(i => { %>
+        <div class="small" style="padding:6px 0;border-bottom:1px solid var(--line-2)"><strong><%= i.product_name %></strong> (<%= i.size_label %>) ×<%= i.qty %> — <%= baht(i.line_total) %><br><span class="muted"><%= T.dt(i.start_at) %> → คืน <%= T.dt(i.due_at) %></span></div>
+      <% }) %>
+      <form method="post" action="/orders/<%= o.code %>/cancel" data-confirm="ยืนยันการยกเลิกคำสั่งจองนี้?" style="margin-top:14px">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn ghost sm" style="color:var(--bad);padding-left:0">ยกเลิกคำสั่งจอง</button>
+      </form>
+    </div>
+  </div>
+</div>
+<%- include('../partials/footer') %>
