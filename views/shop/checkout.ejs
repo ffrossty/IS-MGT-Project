@@ -34,6 +34,8 @@
           <%- fld('recipient_name', 'ชื่อ-นามสกุล', 'text', { attrs: 'autocomplete="name" maxlength="120"' }) %>
           <%- fld('phone', 'หมายเลขโทรศัพท์', 'tel', { attrs: 'autocomplete="tel" inputmode="tel" pattern="0[0-9]{8,9}" maxlength="12"' }) %>
           <%- fld('address', 'ที่อยู่จัดส่ง (บ้านเลขที่ หมู่บ้าน ถนน ซอย)', 'text', { full: true, attrs: 'autocomplete="street-address" maxlength="300"' }) %>
+          <%- fld('subdistrict', 'แขวง/ตำบล', 'text', { attrs: 'maxlength="100"' }) %>
+          <%- fld('district', 'เขต/อำเภอ', 'text', { attrs: 'maxlength="100"' }) %>
           <div class="field <%= errors.province ? 'has-error' : '' %>">
             <label for="province" class="req">จังหวัด</label>
             <select id="province" name="province" required>
@@ -42,8 +44,6 @@
             </select>
             <% if (errors.province) { %><div class="err"><%= errors.province %></div><% } %>
           </div>
-          <%- fld('district', 'เขต/อำเภอ', 'text', { attrs: 'maxlength="100"' }) %>
-          <%- fld('subdistrict', 'แขวง/ตำบล', 'text', { attrs: 'maxlength="100"' }) %>
           <%- fld('postcode', 'รหัสไปรษณีย์', 'text', { attrs: 'inputmode="numeric" pattern="[0-9]{5}" maxlength="5" autocomplete="postal-code"' }) %>
           <div class="field full"><label for="customer_note">หมายเหตุถึงร้าน (ไม่บังคับ)</label><textarea id="customer_note" name="customer_note" maxlength="500"><%= form.customer_note || '' %></textarea></div>
         </div>
