@@ -103,11 +103,11 @@ router.get('/', (req, res) => {
   // สัดส่วน B / W / H / L (นิ้ว): ลูกค้าใส่ช่วง "ตั้งแต่ … ถึง …" — ชุดที่ค่าอยู่ในช่วงเท่านั้นที่แสดง
   const measure = readMeasureFilter(q);
   //   • Freesize → เฉพาะชุดที่สัดส่วนนั้นเป็น Freesize
-  //   • ช่วงตัวเลข → ชุดที่ค่าอยู่ในช่วง + ชุดที่สัดส่วนนั้นเป็น Freesize (ใส่ได้ทุกขนาด)
+  //   • ช่วงตัวเลข → ชุดที่สัดส่วน (ค่าเดียวหรือช่วง) ซ้อนทับกับช่วงที่ลูกค้าใส่ + ชุดที่สัดส่วนนั้นเป็น Freesize
   for (const m of measure.active) {
     if (m.free) { where.push(`p.${m.col}_free = 1`); continue; }
     const cond = [];
-    if (m.min != null) { cond.push(`p.${m.col} >= @${m.key}min`); params[`${m.key}min`] = m.min; }
+    if (m.min != null) { cond.push(`COALESCE(p.${m.col}_max, p.${m.col}) >= @${m.key}min`); params[`${m.key}min`] = m.min; }
     if (m.max != null) { cond.push(`p.${m.col} <= @${m.key}max`); params[`${m.key}max`] = m.max; }
     where.push(`(p.${m.col}_free = 1 OR (${cond.join(' AND ')}))`);
   }

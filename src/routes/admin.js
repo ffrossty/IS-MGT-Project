@@ -212,7 +212,11 @@ function readProduct(b) {
     size: L.SIZES.includes(b.size) ? b.size : null,
     ...Object.fromEntries(L.MEASURES.flatMap((m) => {
       const free = b[`${m.col}_free`] ? 1 : 0;   // Freesize → ไม่ต้องใส่ตัวเลข
-      return [[m.col, free ? null : measure(b[m.col])], [`${m.col}_free`, free]];
+      let lo = free ? null : measure(b[m.col]); let hi = free ? null : measure(b[`${m.col}_max`]);
+      if (lo == null && hi != null) { lo = hi; hi = null; }      // ใส่แค่ช่อง "ถึง" = ค่าเดียว
+      if (lo != null && hi != null && hi < lo) [lo, hi] = [hi, lo];
+      if (hi === lo) hi = null;
+      return [[m.col, lo], [`${m.col}_max`, hi], [`${m.col}_free`, free]];
     })),
     price_tiers: JSON.stringify(tiers),
     base_price: tiers[0].price, base_days: tiers[0].days,  // kept in sync for sorting / price filter
@@ -229,9 +233,9 @@ router.post('/products', productUpload.array('images', 12), (req, res) => {
   const p = readProduct(req.body);
   const now = Date.now();
   const id = db.transaction(() => {
-    const info = db.prepare(`INSERT INTO products(name, description, conditions, size, bust, waist, hip, length, bust_free, waist_free, hip_free, length_free, base_price, base_days, extra_day_price,
+    const info = db.prepare(`INSERT INTO products(name, description, conditions, size, bust, waist, hip, length, bust_max, waist_max, hip_max, length_max, bust_free, waist_free, hip_free, length_free, base_price, base_days, extra_day_price,
       price_tiers, promo_type, promo_value, promo_start, promo_end, promo_label,
-      buffer_before_hours, buffer_after_hours, is_active, created_at, updated_at) VALUES (@name, @description, @conditions, @size, @bust, @waist, @hip, @length, @bust_free, @waist_free, @hip_free, @length_free,
+      buffer_before_hours, buffer_after_hours, is_active, created_at, updated_at) VALUES (@name, @description, @conditions, @size, @bust, @waist, @hip, @length, @bust_max, @waist_max, @hip_max, @length_max, @bust_free, @waist_free, @hip_free, @length_free,
       @base_price, @base_days, @extra_day_price, @price_tiers, @promo_type, @promo_value, @promo_start, @promo_end, @promo_label,
       @buffer_before_hours, @buffer_after_hours, @is_active, @now, @now)`).run({ ...p, now });
     const pid = info.lastInsertRowid;
@@ -251,6 +255,7 @@ router.post('/products/:id', productUpload.array('images', 12), (req, res) => {
   db.transaction(() => {
     db.prepare(`UPDATE products SET name=@name, description=@description, conditions=@conditions,
       size=@size, bust=@bust, waist=@waist, hip=@hip, length=@length,
+      bust_max=@bust_max, waist_max=@waist_max, hip_max=@hip_max, length_max=@length_max,
       bust_free=@bust_free, waist_free=@waist_free, hip_free=@hip_free, length_free=@length_free,
       base_price=@base_price, base_days=@base_days, extra_day_price=@extra_day_price, price_tiers=@price_tiers,
       promo_type=@promo_type, promo_value=@promo_value, promo_start=@promo_start, promo_end=@promo_end, promo_label=@promo_label, buffer_before_hours=@buffer_before_hours,

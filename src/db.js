@@ -232,6 +232,10 @@ addColumn('products', 'bust', 'REAL');
 addColumn('products', 'waist', 'REAL');
 addColumn('products', 'hip', 'REAL');
 addColumn('products', 'length', 'REAL');
+addColumn('products', 'bust_max', 'REAL');      // ถ้ามีค่า = สัดส่วนเป็นช่วง (bust … bust_max) เช่น ผ้ายืด 32–36
+addColumn('products', 'waist_max', 'REAL');
+addColumn('products', 'hip_max', 'REAL');
+addColumn('products', 'length_max', 'REAL');
 addColumn('products', 'bust_free', 'INTEGER NOT NULL DEFAULT 0');    // 1 = Freesize สำหรับสัดส่วนนั้น
 addColumn('products', 'waist_free', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('products', 'hip_free', 'INTEGER NOT NULL DEFAULT 0');

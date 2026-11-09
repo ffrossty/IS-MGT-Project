@@ -455,8 +455,9 @@ s.was, .price s { color: var(--muted); font-weight: 400; font-size: .85em; }
 .pdp-measures .ab { font-size: .72rem; font-weight: 600; letter-spacing: .08em; color: var(--muted); }
 .pdp-measures strong { font-size: 1.25rem; font-weight: 600; line-height: 1.1; }
 .pdp-measures .lab { font-size: .68rem; color: var(--muted); }
-.measure-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-@media (max-width: 640px) { .measure-grid { grid-template-columns: repeat(2, 1fr); } }
+.measure-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 16px; }
+@media (max-width: 640px) { .measure-grid { grid-template-columns: 1fr; } }
+.mfield .mf-range input { text-align: left; }
 .fs-toggle { display: inline-flex; align-items: center; gap: 5px; margin: 0; font-size: .74rem; color: var(--muted); cursor: pointer; user-select: none; font-weight: 500; }
 .fs-toggle input { width: 14px; height: 14px; margin: 0; accent-color: var(--ink); }
 .fs-toggle:has(input:checked) { color: var(--ink); }

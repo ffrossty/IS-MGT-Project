@@ -42,8 +42,10 @@ function sz(label, withWord = false) { return label ? ` (${withWord ? 'ไซส
 /** One measurement value for display: number (inches), 'Freesize', or null when not set. */
 function measureValue(p, col) {
   if (p[`${col}_free`]) return 'Freesize';
-  const v = p[col];
-  return v == null || v === '' ? null : String(Math.round(Number(v) * 10) / 10);
+  const f = (v) => (v == null || v === '' ? null : String(Math.round(Number(v) * 10) / 10));
+  const lo = f(p[col]); const hi = f(p[`${col}_max`]);
+  if (lo === null) return null;
+  return hi !== null && hi !== lo ? `${lo}–${hi}` : lo;
 }
 
 /** Measurements text, e.g. "B 34 · W 28 · H Freesize · L 40" (numbers are inches). */
