@@ -7,6 +7,7 @@ const T = require('../lib/time');
 const L = require('../lib/labels');
 const { unitPrice } = require('../lib/pricing');
 const { requireLogin } = require('../middleware/auth');
+const addr = require('../lib/thai-address');
 
 const router = express.Router();
 
@@ -203,7 +204,8 @@ router.get('/checkout', requireLogin, (req, res) => {
   if (!cart.lines.length) return res.redirect('/cart');
   if (!cart.ok) { res.flash('error', 'มีสินค้าในตะกร้าที่ไม่สามารถจองได้ กรุณาแก้ไขก่อนดำเนินการต่อ'); return res.redirect('/cart'); }
   const last = db.prepare('SELECT recipient_name, phone, address, province, district, subdistrict, postcode, shipping_method FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 1').get(req.user.id);
-  res.render('shop/checkout', { title: 'ข้อมูลการจัดส่ง', cart, form: req.session.checkoutForm || last || {}, errors: {}, provinces: L.PROVINCES, emsFee: settingNum('ems_fee', 0) });
+  const form = req.session.checkoutForm || last || {};
+  res.render('shop/checkout', { title: 'ข้อมูลการจัดส่ง', cart, form, errors: {}, provinces: L.PROVINCES, addrOpts: addr.options(form), emsFee: settingNum('ems_fee', 0) });
 });
 
 function validateShipping(b) {
@@ -217,10 +219,7 @@ function validateShipping(b) {
   if (f.recipient_name.length < 2) e.recipient_name = 'กรุณากรอกชื่อ-นามสกุล';
   if (!/^0\d{8,9}$/.test(f.phone)) e.phone = 'เบอร์โทรศัพท์ไม่ถูกต้อง (เช่น 0812345678)';
   if (f.address.length < 5) e.address = 'กรุณากรอกที่อยู่ (บ้านเลขที่ ถนน ซอย)';
-  if (!L.PROVINCES.includes(f.province)) e.province = 'กรุณาเลือกจังหวัด';
-  if (!f.district) e.district = 'กรุณากรอกเขต/อำเภอ';
-  if (!f.subdistrict) e.subdistrict = 'กรุณากรอกแขวง/ตำบล';
-  if (!/^\d{5}$/.test(f.postcode)) e.postcode = 'รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก';
+  Object.assign(e, addr.validate(f));
   if (!['ems', 'express'].includes(f.shipping_method)) e.shipping_method = 'กรุณาเลือกวิธีจัดส่ง';
   for (const k of ['recipient_name', 'address', 'district', 'subdistrict']) f[k] = f[k].slice(0, 300);
   return { f, e };
@@ -230,7 +229,7 @@ router.post('/checkout', requireLogin, (req, res) => {
   const { f, e } = validateShipping(req.body);
   if (Object.keys(e).length) {
     const cart = O.evaluateCart(req.user.id);
-    return res.status(422).render('shop/checkout', { title: 'ข้อมูลการจัดส่ง', cart, form: f, errors: e, provinces: L.PROVINCES, emsFee: settingNum('ems_fee', 0) });
+    return res.status(422).render('shop/checkout', { title: 'ข้อมูลการจัดส่ง', cart, form: f, errors: e, provinces: L.PROVINCES, addrOpts: addr.options(f), emsFee: settingNum('ems_fee', 0) });
   }
   req.session.checkoutForm = f;
   try {

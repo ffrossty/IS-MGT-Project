@@ -68,10 +68,41 @@
       $$('input[name=shipping_method]').forEach((r) => r.addEventListener('change', upd));
     }
 
+    // checkout: cascading Thai address dropdowns (จังหวัด → เขต/อำเภอ → แขวง/ตำบล → รหัสไปรษณีย์)
+    if ($('[data-addr=province]')) setupAddress();
+
     // product page booking box
     const book = $('#book');
     if (book) setupBooking(book);
   });
+
+  async function setupAddress() {
+    const sel = (n) => $(`[data-addr=${n}]`);
+    const prov = sel('province'); const dist = sel('district'); const sub = sel('subdistrict'); const zip = sel('postcode');
+    let tree;
+    try { tree = await fetch('/static/data/th-address.json').then((r) => r.json()); } catch (e) { return; }
+    const sortTh = (a) => a.sort((x, y) => x.localeCompare(y, 'th'));
+    const fill = (el, items, placeholder) => {
+      const keep = el.value;
+      el.innerHTML = '';
+      el.add(new Option(placeholder, ''));
+      items.forEach((v) => el.add(new Option(v, v)));
+      el.value = items.includes(keep) ? keep : '';
+      if (items.length === 1 && el === zip) el.value = items[0];
+      el.disabled = items.length === 0;
+    };
+    const update = (from) => {
+      const p = tree[prov.value] || {};
+      if (from <= 0) fill(dist, sortTh(Object.keys(p)), 'เลือกเขต/อำเภอ');
+      const d = p[dist.value] || {};
+      if (from <= 1) fill(sub, sortTh(Object.keys(d)), 'เลือกแขวง/ตำบล');
+      fill(zip, d[sub.value] || [], 'เลือกรหัสไปรษณีย์');
+    };
+    prov.addEventListener('change', () => update(0));
+    dist.addEventListener('change', () => update(1));
+    sub.addEventListener('change', () => update(2));
+    update(0);
+  }
 
   function setupBooking(form) {
     const box = $('[data-avail]');

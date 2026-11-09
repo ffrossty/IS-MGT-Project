@@ -89,6 +89,9 @@ test('booking flow locks stock and prevents double booking', async () => {
   // missing required fields → 422
   const bad = await alice.post('/checkout', { ...ship, postcode: '12' }, '/checkout');
   assert.equal(bad.status, 422);
+  // district that doesn't belong to the province is rejected
+  const badAddr = await alice.post('/checkout', { ...ship, district: 'เมืองเชียงใหม่' }, '/checkout');
+  assert.equal(badAddr.status, 422);
 
   const co = await alice.post('/checkout', ship, '/checkout');
   assert.equal(co.status, 302);

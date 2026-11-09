@@ -34,17 +34,20 @@
           <%- fld('recipient_name', 'ชื่อ-นามสกุล', 'text', { attrs: 'autocomplete="name" maxlength="120"' }) %>
           <%- fld('phone', 'หมายเลขโทรศัพท์', 'tel', { attrs: 'autocomplete="tel" inputmode="tel" pattern="0[0-9]{8,9}" maxlength="12"' }) %>
           <%- fld('address', 'ที่อยู่จัดส่ง (บ้านเลขที่ หมู่บ้าน ถนน ซอย)', 'text', { full: true, attrs: 'autocomplete="street-address" maxlength="300"' }) %>
-          <%- fld('subdistrict', 'แขวง/ตำบล', 'text', { attrs: 'maxlength="100"' }) %>
-          <%- fld('district', 'เขต/อำเภอ', 'text', { attrs: 'maxlength="100"' }) %>
-          <div class="field <%= errors.province ? 'has-error' : '' %>">
-            <label for="province" class="req">จังหวัด</label>
-            <select id="province" name="province" required>
-              <option value="">เลือกจังหวัด</option>
-              <% provinces.forEach(p => { %><option <%= form.province === p ? 'selected' : '' %>><%= p %></option><% }) %>
-            </select>
-            <% if (errors.province) { %><div class="err"><%= errors.province %></div><% } %>
-          </div>
-          <%- fld('postcode', 'รหัสไปรษณีย์', 'text', { attrs: 'inputmode="numeric" pattern="[0-9]{5}" maxlength="5" autocomplete="postal-code"' }) %>
+          <% const sel = (name, label, placeholder, opts) => { const e = errors[name]; %>
+            <div class="field <%= e ? 'has-error' : '' %>">
+              <label for="<%= name %>" class="req"><%= label %></label>
+              <select id="<%= name %>" name="<%= name %>" required data-addr="<%= name %>">
+                <option value=""><%= placeholder %></option>
+                <% opts.forEach(o => { %><option <%= form[name] === o ? 'selected' : '' %>><%= o %></option><% }) %>
+              </select>
+              <% if (e) { %><div class="err"><%= e %></div><% } %>
+            </div>
+          <% } %>
+          <% sel('province', 'จังหวัด', 'เลือกจังหวัด', provinces) %>
+          <% sel('district', 'เขต/อำเภอ', 'เลือกเขต/อำเภอ', addrOpts.districts) %>
+          <% sel('subdistrict', 'แขวง/ตำบล', 'เลือกแขวง/ตำบล', addrOpts.subdistricts) %>
+          <% sel('postcode', 'รหัสไปรษณีย์', 'เลือกรหัสไปรษณีย์', addrOpts.postcodes) %>
           <div class="field full"><label for="customer_note">หมายเหตุถึงร้าน (ไม่บังคับ)</label><textarea id="customer_note" name="customer_note" maxlength="500"><%= form.customer_note || '' %></textarea></div>
         </div>
       </div>

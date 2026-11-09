@@ -3,6 +3,7 @@ const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const helmet = require('helmet');
+const compression = require('compression');
 const config = require('./config');
 const { getSettings } = require('./db');
 const SqliteStore = require('./lib/session-store');
@@ -31,6 +32,8 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
+app.use(compression());
+app.use('/static/data', express.static(path.join(__dirname, '..', 'public', 'data'), { maxAge: '7d' }));
 app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: config.isProd ? '7d' : 0 }));
 // Product & shop images are public; payment slips are NOT (served via an auth-checked route).
 app.use('/media/products', express.static(path.join(config.uploadDir, 'products'), { maxAge: '30d', fallthrough: false }));
