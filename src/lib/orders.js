@@ -115,10 +115,7 @@ function createOrderFromCart(user, ship, now = Date.now()) {
   });
   const id = tx.immediate();
   sheets.markDirty(id);
-  const created = getOrder(id);
-  // fire-and-forget: a LINE outage must never block the customer's checkout
-  Promise.resolve(line.adminNewOrder(created)).catch((e) => console.error('[line] admin alert', e.message));
-  return created;
+  return getOrder(id);
 }
 
 function assertStatus(order, allowed) {
@@ -142,6 +139,7 @@ function uploadSlip(order, user, filename, now = Date.now()) {
   }).immediate();
   sheets.markDirty(order.id);
   if (res === 'expired') throw new BookingError('หมดเวลาชำระเงินแล้ว สต็อกถูกคืนเข้าระบบ กรุณาทำรายการจองใหม่');
+  // admins are alerted only once the slip is in (nothing to review before that); fire-and-forget
   Promise.resolve(line.adminSlipUploaded(getOrder(order.id))).catch((e) => console.error('[line] admin alert', e.message));
 }
 
@@ -195,7 +193,9 @@ async function cancel(order, actor, reason) {
     const allowed = actor.role === 'admin' ? ['awaiting_payment', 'pending_approval', 'confirmed'] : ['awaiting_payment'];
     assertStatus(o, allowed);
     const now = Date.now();
-    db.prepare("UPDATE orders SET status = 'cancelled', cancelled_at = ?, reject_reason = COALESCE(?, reject_reason), updated_at = ? WHERE id = ?")
+    // payment that was already approved stays 'approved' (money received → refund handled outside the system)
+    db.prepare(`UPDATE orders SET status = 'cancelled', cancelled_at = ?, reject_reason = COALESCE(?, reject_reason),
+      payment_status = CASE WHEN payment_status = 'approved' THEN 'approved' ELSE 'cancelled' END, updated_at = ? WHERE id = ?`)
       .run(now, reason || null, now, o.id);
     orderEvent(o.id, actor, 'cancelled', `ยกเลิกคำสั่งจอง${reason ? `: ${reason}` : ''} — คืนสต็อก`);
   }).immediate();

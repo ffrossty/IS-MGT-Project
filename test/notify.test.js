@@ -70,6 +70,7 @@ test('admin cancels → LINE with reason; customer self-cancel → no LINE', asy
   await O.cancel(a.order, admin, 'ลูกค้าแจ้งเลื่อนงาน');
   assert.equal(sent.length, 1);
   assert.match(sent[0].messages[0].text, /คำสั่งซื้อถูกยกเลิก[\s\S]*เหตุผล: ลูกค้าแจ้งเลื่อนงาน/);
+  assert.equal(O.getOrder(a.order.id).payment_status, 'cancelled', 'unpaid/unapproved → payment shown as cancelled');
 
   sent.length = 0;
   const b = makeOrder('awaiting_payment');
@@ -117,4 +118,13 @@ test('admins get a LINE alert only after the customer uploads a slip', async () 
   await new Promise((r) => setTimeout(r, 50));
   assert.equal(sent.filter((m) => m.to === adminLine).length, 0, 'switch off works');
   setSettings({ notify_admin_slip: '1' });
+});
+
+test('cancelling an already-approved order keeps payment as approved (refund case)', async () => {
+  const { order } = makeOrder('confirmed');
+  db.prepare("UPDATE orders SET payment_status = 'approved' WHERE id = ?").run(order.id);
+  await O.cancel(O.getOrder(order.id), admin, 'ชุดเสียหาย');
+  const o = O.getOrder(order.id);
+  assert.equal(o.status, 'cancelled');
+  assert.equal(o.payment_status, 'approved');
 });

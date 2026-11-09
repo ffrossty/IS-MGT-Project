@@ -220,7 +220,6 @@ const DEFAULT_SETTINGS = {
   payment_qr_image: '',
   payment_hold_minutes: '60',      // time to pay & upload slip
   slip_reupload_minutes: '60',     // time to upload a new slip after admin rejects one
-  notify_admin_new_order: '1',     // LINE admins when a customer places an order
   notify_admin_slip: '1',          // LINE admins when a customer uploads a slip
   admin_review_hours: '24',        // target time for admin to verify slip
   auto_expire_unreviewed: '0',     // 1 = release stock if admin doesn't review in time
@@ -240,6 +239,19 @@ for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insertSetting.run(k, v);
 
 // one-time rename of the original placeholder shop name
 db.prepare("UPDATE settings SET value = 'GMD Rental' WHERE key = 'shop_name' AND value = 'Maison Lumière'").run();
+
+// one-time: orders cancelled before the 'cancelled' payment status existed
+{
+  const ids = db.prepare("SELECT id FROM orders WHERE status = 'cancelled' AND payment_status NOT IN ('approved','cancelled')").all();
+  if (ids.length) {
+    db.transaction(() => {
+      for (const { id } of ids) {
+        db.prepare("UPDATE orders SET payment_status = 'cancelled' WHERE id = ?").run(id);
+        db.prepare("INSERT INTO sheet_sync(order_id, dirty, status) VALUES (?, 1, 'pending') ON CONFLICT(order_id) DO UPDATE SET dirty = 1").run(id);
+      }
+    })();
+  }
+}
 
 const settingsCache = { data: null };
 function getSettings() {

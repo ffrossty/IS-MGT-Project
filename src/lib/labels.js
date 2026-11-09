@@ -16,6 +16,7 @@ const PAYMENT_STATUS = {
   submitted: { th: 'ส่งสลิปแล้ว รอตรวจสอบ', tone: 'info' },
   approved: { th: 'ชำระเงินสำเร็จ', tone: 'ok' },
   rejected: { th: 'สลิปไม่ผ่าน', tone: 'bad' },
+  cancelled: { th: 'คำสั่งซื้อถูกยกเลิก การชำระเงินไม่สำเร็จ', tone: 'bad' },
 };
 
 const SHIPPING_STATUS = {
@@ -47,7 +48,6 @@ const NOTIFICATION_TYPE = {
   slip_rejected: 'ขอสลิปใหม่',
   order_rejected: 'ปฏิเสธคำสั่งจอง',
   order_cancelled: 'ยกเลิกคำสั่งซื้อ',
-  admin_new_order: 'แจ้งแอดมิน: ออเดอร์ใหม่',
   admin_slip_uploaded: 'แจ้งแอดมิน: สลิปรอตรวจ',
 };
 
