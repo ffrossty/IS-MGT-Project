@@ -392,15 +392,21 @@ router.get('/orders/:code', loadOrder, (req, res) => {
 });
 
 const back = (req, res, msg) => { if (msg) res.flash('success', msg); res.redirect(`/admin/orders/${req.order.code}`); };
+const loadOrderAsync = (fn) => [loadOrder, wrap(fn)];
 const notifText = (n) => (!n ? '' : n.status === 'sent' ? ' — ส่ง LINE แจ้งลูกค้าแล้ว' : n.status === 'failed' ? ` — ส่ง LINE ไม่สำเร็จ: ${n.error}` : ` — ไม่ได้ส่ง LINE (${n.error})`);
 router.post('/orders/:code/approve', loadOrder, wrap(async (req, res) => {
   const n = await O.approve(req.order, req.user);
   res.flash(n && n.status === 'sent' ? 'success' : 'warn', `ยืนยันคำสั่งจองแล้ว${notifText(n)}`);
   back(req, res);
 }));
-router.post('/orders/:code/reject', loadOrder, (req, res) => { O.reject(req.order, req.user, req.body.reason); back(req, res, 'ปฏิเสธคำสั่งจองและคืนสต็อกแล้ว'); });
-router.post('/orders/:code/request-slip', loadOrder, (req, res) => { O.requestNewSlip(req.order, req.user, req.body.reason); back(req, res, 'แจ้งลูกค้าให้อัปโหลดสลิปใหม่แล้ว (สต็อกยังถูกล็อก)'); });
-router.post('/orders/:code/cancel', loadOrder, (req, res) => { O.cancel(req.order, req.user, String(req.body.reason || '').trim() || 'แอดมินยกเลิก'); back(req, res, 'ยกเลิกคำสั่งซื้อและคืนสต็อกแล้ว'); });
+const withNotice = (fn, msg) => loadOrderAsync(async (req, res) => {
+  const n = await fn(req);
+  res.flash(!n || n.status === 'sent' ? 'success' : 'warn', `${msg}${notifText(n)}`);
+  back(req, res);
+});
+router.post('/orders/:code/reject', withNotice((req) => O.reject(req.order, req.user, req.body.reason), 'ปฏิเสธคำสั่งจองและคืนสต็อกแล้ว'));
+router.post('/orders/:code/request-slip', withNotice((req) => O.requestNewSlip(req.order, req.user, req.body.reason), 'ขอสลิปใหม่จากลูกค้าแล้ว (สต็อกยังถูกล็อก)'));
+router.post('/orders/:code/cancel', withNotice((req) => O.cancel(req.order, req.user, String(req.body.reason || '').trim() || 'ร้านยกเลิกคำสั่งซื้อ'), 'ยกเลิกคำสั่งซื้อและคืนสต็อกแล้ว'));
 router.post('/orders/:code/returned', loadOrder, (req, res) => { O.markReturned(req.order, req.user); back(req, res, 'บันทึกรับคืนชุดแล้ว'); });
 router.post('/orders/:code/completed', loadOrder, (req, res) => { O.markCompleted(req.order, req.user); back(req, res, 'คำสั่งซื้อเสร็จสิ้น ชุดพร้อมให้เช่าต่อ'); });
 router.post('/orders/:code/shipping', loadOrder, wrap(async (req, res) => {
@@ -453,12 +459,12 @@ router.post('/settings', settingsUpload.single('payment_qr'), (req, res) => {
   const allowed = Object.keys(DEFAULT_SETTINGS).filter((k) => k !== 'payment_qr_image');
   const next = {};
   for (const k of allowed) if (req.body[k] !== undefined) next[k] = String(req.body[k]).trim();
-  next.auto_expire_unreviewed = req.body.auto_expire_unreviewed ? '1' : '0';
-  for (const k of ['ems_fee', 'payment_hold_minutes', 'admin_review_hours', 'buffer_before_hours', 'buffer_after_hours', 'pickup_start_hour', 'pickup_end_hour', 'min_advance_hours', 'max_advance_days']) {
+  for (const k of ['auto_expire_unreviewed', 'notify_admin_new_order', 'notify_admin_slip']) next[k] = req.body[k] ? '1' : '0';
+  for (const k of ['ems_fee', 'payment_hold_minutes', 'slip_reupload_minutes', 'admin_review_hours', 'buffer_before_hours', 'buffer_after_hours', 'pickup_start_hour', 'pickup_end_hour', 'min_advance_hours', 'max_advance_days']) {
     if (next[k] !== undefined && !/^\d+$/.test(next[k])) throw new O.BookingError(`ค่า ${k} ต้องเป็นตัวเลข`);
   }
   if (Number(next.pickup_start_hour) > 23 || Number(next.pickup_end_hour) > 23 || Number(next.pickup_start_hour) > Number(next.pickup_end_hour)) throw new O.BookingError('ช่วงเวลารับ/คืนชุดไม่ถูกต้อง');
-  if (Number(next.payment_hold_minutes) < 5) throw new O.BookingError('เวลาล็อกสต็อกต้องไม่น้อยกว่า 5 นาที');
+  if (Number(next.payment_hold_minutes) < 5 || Number(next.slip_reupload_minutes) < 5) throw new O.BookingError('เวลาล็อกสต็อก/เวลาอัปโหลดสลิปใหม่ต้องไม่น้อยกว่า 5 นาที');
   if (next.duration_options !== undefined) {
     const d = next.duration_options.split(',').map((x) => parseInt(x, 10)).filter((x) => x > 0 && x <= 60);
     if (!d.length) throw new O.BookingError('กรุณาระบุระยะเวลาเช่าอย่างน้อย 1 ค่า');

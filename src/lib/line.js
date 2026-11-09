@@ -76,9 +76,9 @@ async function push(lineUserId, messages) {
   }
 }
 
-async function notify(order, type, text) {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(order.user_id);
-  const log = (status, err) => { insNotif.run(order.id, order.user_id, type, status, err || null, Date.now()); return { status, error: err || null }; };
+async function notify(order, type, text, userId = order.user_id) {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  const log = (status, err) => { insNotif.run(order.id, userId, type, status, err || null, Date.now()); return { status, error: err || null }; };
   if (!config.lineMessagingConfigured) return log('skipped', 'ยังไม่ได้ตั้งค่า LINE_MESSAGING_CHANNEL_ACCESS_TOKEN');
   if (!user || !user.line_user_id || user.line_user_id.startsWith('dev-')) return log('skipped', 'ผู้ใช้นี้ไม่ได้เข้าสู่ระบบด้วย LINE จริง (Dev Login)');
   try {
@@ -112,4 +112,53 @@ function shipped(order) {
   return notify(order, 'shipped', text);
 }
 
-module.exports = { buildAuthorizeUrl, handleCallback, callbackUrl, bookingConfirmed, shipped, push };
+function itemsShort(order) {
+  return db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(order.id)
+    .map((it) => `• ${it.product_name} (ไซส์ ${it.size_label}) x${it.qty} — ${T.dt(it.start_at)}`).join('\n');
+}
+
+function slipRejected(order, reason) {
+  const text = `⚠️ ${getSettings().shop_name}: สลิปการโอนเงินไม่ผ่านการตรวจสอบ\nหมายเลขคำสั่งซื้อ: ${order.code}\n\nเหตุผล: ${reason}\n\n`
+    + `ยอดที่ต้องชำระ: ฿${order.total.toLocaleString('th-TH')}\nกรุณาอัปโหลดสลิปใหม่ภายใน ${T.dt(order.hold_expires_at)}\n`
+    + `(ระบบยังล็อกชุดไว้ให้จนถึงเวลาดังกล่าว หากเกินเวลาคำสั่งจองจะถูกยกเลิกอัตโนมัติ)\n\nอัปโหลดสลิปใหม่: ${config.baseUrl}/orders/${order.code}/pay`;
+  return notify(order, 'slip_rejected', text);
+}
+
+function orderRejected(order, reason) {
+  const text = `❌ ${getSettings().shop_name}: คำสั่งจองถูกปฏิเสธ\nหมายเลขคำสั่งซื้อ: ${order.code}\n\n${itemsShort(order)}\n\nเหตุผล: ${reason}\n\n`
+    + `หากมีข้อสงสัยหรือได้ชำระเงินแล้ว กรุณาติดต่อร้านผ่าน LINE นี้\nรายละเอียด: ${config.baseUrl}/orders/${order.code}`;
+  return notify(order, 'order_rejected', text);
+}
+
+function orderCancelled(order, reason) {
+  const paid = order.payment_status === 'approved';
+  const text = `🚫 ${getSettings().shop_name}: คำสั่งซื้อถูกยกเลิก\nหมายเลขคำสั่งซื้อ: ${order.code}\n\n${itemsShort(order)}\n\nเหตุผล: ${reason}\n\n`
+    + (paid ? 'ร้านจะติดต่อกลับเรื่องการคืนเงิน หรือติดต่อร้านผ่าน LINE นี้ได้เลย\n' : 'หากมีข้อสงสัย กรุณาติดต่อร้านผ่าน LINE นี้\n')
+    + `รายละเอียด: ${config.baseUrl}/orders/${order.code}`;
+  return notify(order, 'order_cancelled', text);
+}
+
+// ---------- Admin alerts (sent to every admin account that logged in with real LINE) ----------
+async function notifyAdmins(order, type, text) {
+  const admins = db.prepare("SELECT id FROM users WHERE role = 'admin' AND line_user_id NOT LIKE 'dev-%'").all();
+  return Promise.all(admins.map((a) => notify(order, type, text, a.id)));
+}
+
+function adminNewOrder(order) {
+  if (getSettings().notify_admin_new_order !== '1') return null;
+  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(order.id);
+  const ship = order.shipping_method === 'ems' ? 'EMS' : 'Express (Grab/Lalamove)';
+  const text = `🛍️ ออเดอร์ใหม่ ${order.code}\nลูกค้า: ${order.recipient_name} · ${order.phone}\n\n${itemLines(items)}\n\n`
+    + `ยอดรวม: ฿${order.total.toLocaleString('th-TH')} · จัดส่ง ${ship}\nสถานะ: รอลูกค้าชำระเงิน (ล็อกสต็อกถึง ${T.dt(order.hold_expires_at)})\n\n`
+    + `ดูออเดอร์: ${config.baseUrl}/admin/orders/${order.code}`;
+  return notifyAdmins(order, 'admin_new_order', text);
+}
+
+function adminSlipUploaded(order) {
+  if (getSettings().notify_admin_slip !== '1') return null;
+  const text = `💳 มีสลิปรอตรวจสอบ ${order.code}\nลูกค้า: ${order.recipient_name}\nยอดที่ต้องได้รับ: ฿${order.total.toLocaleString('th-TH')}\n`
+    + `ควรตรวจสอบภายใน ${T.dt(order.review_due_at)}\n\nตรวจสลิป: ${config.baseUrl}/admin/orders/${order.code}`;
+  return notifyAdmins(order, 'admin_slip_uploaded', text);
+}
+
+module.exports = { adminNewOrder, adminSlipUploaded, buildAuthorizeUrl, handleCallback, callbackUrl, bookingConfirmed, shipped, slipRejected, orderRejected, orderCancelled, push };

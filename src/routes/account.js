@@ -66,8 +66,8 @@ router.post('/orders/:code/slip', requireLogin, ownOrder, slipUpload.single('sli
   res.redirect(`/orders/${req.order.code}`);
 });
 
-router.post('/orders/:code/cancel', requireLogin, ownOrder, (req, res) => {
-  O.cancel(req.order, req.user, 'ลูกค้ายกเลิกเอง');
+router.post('/orders/:code/cancel', requireLogin, ownOrder, async (req, res, next) => {
+  try { await O.cancel(req.order, req.user, 'ลูกค้ายกเลิกเอง'); } catch (e) { return next(e); }
   res.flash('success', 'ยกเลิกคำสั่งจองแล้ว');
   res.redirect(`/orders/${req.order.code}`);
 });

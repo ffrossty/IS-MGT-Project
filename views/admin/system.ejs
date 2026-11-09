@@ -18,13 +18,13 @@
       <dl class="kv small">
         <dt>ต้องตั้งค่า</dt><dd class="mono">LINE_MESSAGING_CHANNEL_ACCESS_TOKEN</dd>
         <dt>OA Basic ID</dt><dd><%= status.oa || '-' %></dd>
-        <dt>แจ้งเตือน</dt><dd>1) ยืนยันคำสั่งจอง 2) จัดส่งสินค้าแล้ว</dd>
+        <dt>แจ้งเตือน</dt><dd>ยืนยันการจอง · จัดส่งแล้ว · ขอสลิปใหม่ · ปฏิเสธคำสั่งจอง · ยกเลิกคำสั่งซื้อ (พร้อมเหตุผล)</dd>
       </dl>
       <p class="small muted">LINE Login channel และ Messaging API channel ต้องอยู่ใน Provider เดียวกัน และลูกค้าต้องเพิ่ม OA เป็นเพื่อน จึงจะได้รับข้อความ</p>
       <form method="post" action="/admin/system/line-test"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm secondary">ส่งข้อความทดสอบถึง LINE ของฉัน</button></form>
       <h4 style="margin-top:18px">ประวัติการส่งล่าสุด</h4>
       <ul class="event-list">
-        <% notifications.forEach(n => { %><li><span class="badge <%= n.status === 'sent' ? 'ok' : n.status === 'failed' ? 'bad' : 'muted' %>"><%= n.status %></span> <a class="link mono" href="/admin/orders/<%= n.code %>"><%= n.code %></a> · <%= n.type %> <span class="small muted"><%= T.dt(n.created_at) %></span><% if (n.error) { %><div class="small muted"><%= n.error %></div><% } %></li><% }) %>
+        <% notifications.forEach(n => { %><li><span class="badge <%= n.status === 'sent' ? 'ok' : n.status === 'failed' ? 'bad' : 'muted' %>"><%= n.status %></span> <a class="link mono" href="/admin/orders/<%= n.code %>"><%= n.code %></a> · <%= L.NOTIFICATION_TYPE[n.type] || n.type %> <span class="small muted"><%= T.dt(n.created_at) %></span><% if (n.error) { %><div class="small muted"><%= n.error %></div><% } %></li><% }) %>
         <% if (!notifications.length) { %><li class="muted small">ยังไม่มี</li><% } %>
       </ul>
     </div>

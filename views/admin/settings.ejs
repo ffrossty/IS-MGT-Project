@@ -23,6 +23,7 @@
       <div class="form-grid">
         <%- inp('payment_hold_minutes', 'ล็อกสต็อกระหว่างรอชำระเงิน (นาที)', 'ถ้าลูกค้าไม่อัปโหลดสลิปภายในเวลานี้ ระบบคืนสต็อกอัตโนมัติ', 'number') %>
         <%- inp('admin_review_hours', 'เวลาให้แอดมินตรวจสลิป (ชั่วโมง)', 'เกินเวลาจะแจ้งเตือนบน Dashboard', 'number') %>
+        <%- inp('slip_reupload_minutes', 'เวลาให้ลูกค้าอัปโหลดสลิปใหม่ (นาที)', 'นับจากที่แอดมินกด “ขอสลิปใหม่” — แจ้งในข้อความ LINE ถึงลูกค้า', 'number') %>
       </div>
       <label class="checkbox"><input type="checkbox" name="auto_expire_unreviewed" value="1" <%= s.auto_expire_unreviewed === '1' ? 'checked' : '' %>> ปลดล็อกสต็อกอัตโนมัติหากแอดมินไม่ตรวจสอบภายในเวลาที่กำหนด</label>
       <p class="hint small muted">ค่าเริ่มต้น: ปิด (ลูกค้าโอนเงินแล้ว จึงคงการล็อกไว้และแจ้งเตือนแอดมินแทน)</p>
@@ -36,6 +37,11 @@
         <%- inp('max_advance_days', 'จองล่วงหน้าได้ไม่เกิน (วัน)', '', 'number') %>
       </div>
       <%- inp('duration_options', 'ระยะเวลาเช่าที่เปิดให้เลือก (วัน)', 'คั่นด้วย comma เช่น 1,2,3,5,7 — คำนวณเป็นชั่วโมง (1 วัน = 24 ชม.)') %>
+    </div>
+    <div class="card"><h3>แจ้งเตือนแอดมินทาง LINE</h3>
+      <label class="checkbox"><input type="checkbox" name="notify_admin_new_order" value="1" <%= s.notify_admin_new_order === '1' ? 'checked' : '' %>> เมื่อมีลูกค้าสั่งจองเข้ามา (ออเดอร์ใหม่)</label>
+      <label class="checkbox" style="margin-top:8px"><input type="checkbox" name="notify_admin_slip" value="1" <%= s.notify_admin_slip === '1' ? 'checked' : '' %>> เมื่อลูกค้าอัปโหลดสลิป (รอตรวจสอบ)</label>
+      <p class="hint small muted" style="margin-top:8px">ส่งถึงทุกบัญชีที่เป็น Admin และเข้าสู่ระบบด้วย LINE แล้ว — แอดมินต้องเพิ่ม LINE OA ของร้านเป็นเพื่อนก่อนจึงจะได้รับข้อความ</p>
     </div>
     <div class="card"><h3>เงื่อนไขการเช่า (ทั่วไป)</h3><textarea name="rental_terms" rows="6"><%= s.rental_terms %></textarea></div>
     <button class="btn block">บันทึกการตั้งค่า</button>

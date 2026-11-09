@@ -115,7 +115,10 @@ function createOrderFromCart(user, ship, now = Date.now()) {
   });
   const id = tx.immediate();
   sheets.markDirty(id);
-  return getOrder(id);
+  const created = getOrder(id);
+  // fire-and-forget: a LINE outage must never block the customer's checkout
+  Promise.resolve(line.adminNewOrder(created)).catch((e) => console.error('[line] admin alert', e.message));
+  return created;
 }
 
 function assertStatus(order, allowed) {
@@ -139,6 +142,7 @@ function uploadSlip(order, user, filename, now = Date.now()) {
   }).immediate();
   sheets.markDirty(order.id);
   if (res === 'expired') throw new BookingError('หมดเวลาชำระเงินแล้ว สต็อกถูกคืนเข้าระบบ กรุณาทำรายการจองใหม่');
+  Promise.resolve(line.adminSlipUploaded(getOrder(order.id))).catch((e) => console.error('[line] admin alert', e.message));
 }
 
 async function approve(order, admin) {
@@ -155,7 +159,7 @@ async function approve(order, admin) {
   return line.bookingConfirmed(getOrder(order.id));
 }
 
-function reject(order, admin, reason) {
+async function reject(order, admin, reason) {
   if (!reason || !reason.trim()) throw new BookingError('กรุณาระบุเหตุผลในการปฏิเสธ');
   db.transaction(() => {
     const o = getOrder(order.id);
@@ -166,24 +170,26 @@ function reject(order, admin, reason) {
     orderEvent(o.id, admin, 'rejected', `ปฏิเสธคำสั่งจอง: ${reason.trim()} — คืนสต็อกที่ล็อกไว้`);
   }).immediate();
   sheets.markDirty(order.id);
+  return line.orderRejected(getOrder(order.id), reason.trim());
 }
 
 /** Slip is wrong/unclear: keep the booking, ask the customer to upload a new slip. */
-function requestNewSlip(order, admin, reason) {
+async function requestNewSlip(order, admin, reason) {
   if (!reason || !reason.trim()) throw new BookingError('กรุณาระบุเหตุผล');
   db.transaction(() => {
     const o = getOrder(order.id);
     assertStatus(o, ['pending_approval']);
     const now = Date.now();
-    const hold = now + settingNum('payment_hold_minutes', 60) * 60000 * 2;
+    const hold = now + settingNum('slip_reupload_minutes', 60) * 60000;
     db.prepare(`UPDATE orders SET status = 'awaiting_payment', payment_status = 'rejected', reject_reason = ?, hold_expires_at = ?,
       updated_at = ? WHERE id = ?`).run(reason.trim(), hold, now, o.id);
     orderEvent(o.id, admin, 'slip_rejected', `สลิปไม่ผ่านการตรวจสอบ: ${reason.trim()} — ให้ลูกค้าอัปโหลดใหม่ภายใน ${T.dt(hold)}`);
   }).immediate();
   sheets.markDirty(order.id);
+  return line.slipRejected(getOrder(order.id), reason.trim());
 }
 
-function cancel(order, actor, reason) {
+async function cancel(order, actor, reason) {
   db.transaction(() => {
     const o = getOrder(order.id);
     const allowed = actor.role === 'admin' ? ['awaiting_payment', 'pending_approval', 'confirmed'] : ['awaiting_payment'];
@@ -194,6 +200,9 @@ function cancel(order, actor, reason) {
     orderEvent(o.id, actor, 'cancelled', `ยกเลิกคำสั่งจอง${reason ? `: ${reason}` : ''} — คืนสต็อก`);
   }).immediate();
   sheets.markDirty(order.id);
+  // the customer cancelling their own order doesn't need a message; admin cancellations do
+  if (actor.role === 'admin') return line.orderCancelled(getOrder(order.id), reason || 'ร้านยกเลิกคำสั่งซื้อ');
+  return null;
 }
 
 function markReturned(order, admin) {

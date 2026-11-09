@@ -209,7 +209,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 db.exec(SCHEMA);
 
 const DEFAULT_SETTINGS = {
-  shop_name: 'Maison Lumière',
+  shop_name: 'GMD Rental',
   shop_tagline: 'Fashion rental · เช่าชุดออกงาน',
   shop_phone: '',
   shop_line_url: '',
@@ -219,6 +219,9 @@ const DEFAULT_SETTINGS = {
   promptpay_name: '',
   payment_qr_image: '',
   payment_hold_minutes: '60',      // time to pay & upload slip
+  slip_reupload_minutes: '60',     // time to upload a new slip after admin rejects one
+  notify_admin_new_order: '1',     // LINE admins when a customer places an order
+  notify_admin_slip: '1',          // LINE admins when a customer uploads a slip
   admin_review_hours: '24',        // target time for admin to verify slip
   auto_expire_unreviewed: '0',     // 1 = release stock if admin doesn't review in time
   buffer_before_hours: '24',       // prepare/ship before rental start
@@ -234,6 +237,9 @@ const DEFAULT_SETTINGS = {
 
 const insertSetting = db.prepare('INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)');
 for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insertSetting.run(k, v);
+
+// one-time rename of the original placeholder shop name
+db.prepare("UPDATE settings SET value = 'GMD Rental' WHERE key = 'shop_name' AND value = 'Maison Lumière'").run();
 
 const settingsCache = { data: null };
 function getSettings() {

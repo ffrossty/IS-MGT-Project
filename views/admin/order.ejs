@@ -133,7 +133,7 @@
       <h3>LINE Notification</h3>
       <% if (!notifications.length) { %><p class="muted small">ยังไม่มีการส่ง (ระบบส่งเมื่อยืนยันคำสั่งจอง และเมื่อจัดส่งแล้ว)</p><% } %>
       <ul class="event-list">
-        <% notifications.forEach(n => { %><li><span class="badge <%= n.status === 'sent' ? 'ok' : n.status === 'failed' ? 'bad' : 'muted' %>"><%= n.status %></span> <%= n.type === 'booking_confirmed' ? 'ยืนยันการจอง' : 'แจ้งจัดส่ง' %> <span class="small muted">· <%= T.dt(n.created_at) %></span><% if (n.error) { %><div class="small muted"><%= n.error %></div><% } %></li><% }) %>
+        <% notifications.forEach(n => { %><li><span class="badge <%= n.status === 'sent' ? 'ok' : n.status === 'failed' ? 'bad' : 'muted' %>"><%= n.status %></span> <%= L.NOTIFICATION_TYPE[n.type] || n.type %> <span class="small muted">· <%= T.dt(n.created_at) %></span><% if (n.error) { %><div class="small muted"><%= n.error %></div><% } %></li><% }) %>
       </ul>
     </div>
 
@@ -149,18 +149,18 @@
 </div>
 
 <dialog id="dlg-reject"><form method="post" action="/admin/orders/<%= o.code %>/reject"><input type="hidden" name="_csrf" value="<%= csrf %>">
-  <h3>ปฏิเสธคำสั่งจอง</h3><p class="small muted">ระบบจะคืนสต็อกที่ล็อกไว้ และแสดงเหตุผลให้ลูกค้าเห็นบนเว็บไซต์</p>
-  <div class="field"><label class="req">เหตุผล</label><textarea name="reason" required></textarea></div>
+  <h3>ปฏิเสธคำสั่งจอง</h3><p class="small muted">ระบบจะคืนสต็อกที่ล็อกไว้ และส่งเหตุผลถึงลูกค้าทาง LINE OA และหน้าเว็บไซต์</p>
+  <div class="field"><label class="req">เหตุผล (ส่งถึงลูกค้า)</label><textarea name="reason" required></textarea></div>
   <div class="row"><button class="btn danger">ปฏิเสธ</button><button type="button" class="btn ghost" data-close-dialog>ปิด</button></div>
 </form></dialog>
 <dialog id="dlg-slip"><form method="post" action="/admin/orders/<%= o.code %>/request-slip"><input type="hidden" name="_csrf" value="<%= csrf %>">
-  <h3>ขอสลิปใหม่</h3><p class="small muted">สถานะจะกลับเป็น “รอชำระเงิน” และยังคงล็อกสต็อกไว้ให้ลูกค้าอัปโหลดสลิปใหม่</p>
-  <div class="field"><label class="req">เหตุผล</label><textarea name="reason" required placeholder="เช่น ยอดเงินไม่ตรง / รูปไม่ชัด"></textarea></div>
+  <h3>ขอสลิปใหม่</h3><p class="small muted">สถานะจะกลับเป็น “รอชำระเงิน” ยังคงล็อกสต็อกไว้ และส่ง LINE แจ้งลูกค้าพร้อมเหตุผล ยอดที่ต้องชำระ และเวลาที่ต้องอัปโหลดสลิปใหม่ (<%= settings.slip_reupload_minutes %> นาทีนับจากนี้)</p>
+  <div class="field"><label class="req">เหตุผล (ส่งถึงลูกค้า)</label><textarea name="reason" required placeholder="เช่น ยอดเงินไม่ตรง / รูปไม่ชัด"></textarea></div>
   <div class="row"><button class="btn">ส่งคำขอ</button><button type="button" class="btn ghost" data-close-dialog>ปิด</button></div>
 </form></dialog>
 <dialog id="dlg-cancel"><form method="post" action="/admin/orders/<%= o.code %>/cancel"><input type="hidden" name="_csrf" value="<%= csrf %>">
-  <h3>ยกเลิกคำสั่งซื้อ</h3><p class="small muted">สต็อกจะถูกคืนเข้าระบบทันที<%= o.payment_status === 'approved' ? ' — คำสั่งซื้อนี้ชำระเงินแล้ว อย่าลืมดำเนินการคืนเงินนอกระบบ' : '' %></p>
-  <div class="field"><label>เหตุผล</label><textarea name="reason"></textarea></div>
+  <h3>ยกเลิกคำสั่งซื้อ</h3><p class="small muted">สต็อกจะถูกคืนเข้าระบบทันที และส่ง LINE แจ้งลูกค้าพร้อมเหตุผล<%= o.payment_status === 'approved' ? ' — คำสั่งซื้อนี้ชำระเงินแล้ว อย่าลืมดำเนินการคืนเงินนอกระบบ' : '' %></p>
+  <div class="field"><label>เหตุผล (ส่งถึงลูกค้า)</label><textarea name="reason" placeholder="เช่น ชุดเสียหายไม่พร้อมให้เช่า"></textarea></div>
   <div class="row"><button class="btn danger">ยืนยันยกเลิก</button><button type="button" class="btn ghost" data-close-dialog>ปิด</button></div>
 </form></dialog>
 <%- include('../partials/admin-footer') %>
