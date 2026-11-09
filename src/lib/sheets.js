@@ -14,7 +14,7 @@ const L = require('./labels');
 
 const HEADERS = ['Order ID', 'วันที่-เวลาสั่งจอง', 'ชื่อลูกค้า', 'เบอร์โทรศัพท์', 'รายละเอียดสินค้า', 'ไซส์', 'จำนวน',
   'วันเริ่มเช่า', 'วันและเวลาที่ต้องคืน', 'ระยะเวลาเช่า', 'ค่าเช่า (บาท)', 'ค่าจัดส่ง (บาท)', 'ยอดชำระ (บาท)', 'วิธีจัดส่ง',
-  'สถานะการชำระเงิน', 'สถานะคำสั่งซื้อ', 'สถานะจัดส่ง', 'Tracking Number', 'อัปเดตล่าสุด'];
+  'สถานะการชำระเงิน', 'สถานะคำสั่งซื้อ', 'สถานะจัดส่ง', 'Tracking Number', 'อัปเดตล่าสุด', 'ส่งคืน: วิธี', 'ส่งคืน: เลขพัสดุ/ลิงก์'];
 const LAST_COL = String.fromCharCode(64 + HEADERS.length); // 'S'
 
 let tokenCache = { token: null, exp: 0 };
@@ -75,7 +75,7 @@ function buildRow(orderId) {
     (L.PAYMENT_STATUS[o.payment_status] || {}).th || o.payment_status,
     (L.ORDER_STATUS[o.status] || {}).th || o.status,
     o.shipping_status ? L.SHIPPING_STATUS[o.shipping_status].th : '-',
-    o.tracking_number || '', T.dt(Date.now())]; // valueInputOption=RAW → never evaluated as formulas
+    o.tracking_number || '', T.dt(Date.now()), o.return_method ? L.RETURN_METHOD[o.return_method] : '', o.return_tracking || '']; // valueInputOption=RAW → never evaluated as formulas
 }
 
 async function findRow(code) {

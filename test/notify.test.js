@@ -167,3 +167,45 @@ test('return reminder: sent once, 3h before the deadline, only for confirmed ord
   assert.equal(sent.length, 0, '0 = off');
   setSettings({ return_reminder_hours: '3' });
 });
+
+test('customer return: Bangkok must use express; tracking required; admins alerted', async () => {
+  const now = Date.now();
+  db.prepare("INSERT OR IGNORE INTO users(line_user_id, display_name, role, created_at) VALUES ('Uret-admin', 'a', 'admin', ?)").run(now);
+  const { order } = makeOrder('confirmed');          // province: กรุงเทพมหานคร
+  const cust = { id: order.user_id, role: 'customer' };
+  assert.deepEqual(O.returnMethodsFor(order), ['express']);
+  await assert.rejects(() => O.submitReturn(order, cust, { method: 'ems', tracking: 'EF123456789TH' }), /ส่งด่วน/);
+  await assert.rejects(() => O.submitReturn(order, cust, { method: 'express', tracking: '' }), /เลขพัสดุหรือลิงก์/);
+
+  sent.length = 0;
+  const o = await O.submitReturn(order, cust, { method: 'express', tracking: 'https://share.lalamove.com/abc', note: 'ถึง 15:00' });
+  assert.equal(o.return_method, 'express'); assert.ok(o.return_submitted_at);
+  await new Promise((r) => setTimeout(r, 30));
+  const alert = sent.find((m) => m.to === 'Uret-admin');
+  assert.match(alert.messages[0].text, /ลูกค้าแจ้งส่งคืนชุด[\s\S]*Rosé Dress[\s\S]*ส่งด่วน[\s\S]*share\.lalamove\.com\/abc[\s\S]*ถึง 15:00/);
+
+  // other provinces may use EMS
+  const other = makeOrder('confirmed');
+  db.prepare("UPDATE orders SET province = 'เชียงใหม่' WHERE id = ?").run(other.order.id);
+  assert.deepEqual(O.returnMethodsFor(O.getOrder(other.order.id)), ['ems', 'express']);
+  await O.submitReturn(O.getOrder(other.order.id), { id: other.order.user_id, role: 'customer' }, { method: 'ems', tracking: 'EF123456789TH' });
+
+  // only while the order is out with the customer
+  const pend = makeOrder('pending_approval');
+  await assert.rejects(() => O.submitReturn(pend.order, cust, { method: 'express', tracking: 'abc' }), /ไม่สามารถ/);
+});
+
+test('mark returned → cleaning buffer from now → order completes by itself', async () => {
+  const { order } = makeOrder('confirmed');
+  const t = Date.now();  // rental in progress: started 2 days ago, due in 1 day
+  db.prepare('UPDATE order_items SET start_at = ?, block_start = ?, due_at = ?, block_end = ? WHERE order_id = ?').run(t - 2 * T.DAY, t - 3 * T.DAY, t + T.DAY, t + 3 * T.DAY, order.id);
+  const before = Date.now();
+  O.markReturned(order, admin);
+  const item = O.getItems(order.id)[0];
+  assert.ok(item.block_end >= before + 48 * 3600000 && item.block_end <= Date.now() + 48 * 3600000, 'cleaning 48h (default) counted from return');
+  assert.equal(O.getOrder(order.id).status, 'returned');
+  O.runAutoComplete(Date.now());
+  assert.equal(O.getOrder(order.id).status, 'returned', 'still cleaning');
+  O.runAutoComplete(item.block_end + 1);
+  assert.equal(O.getOrder(order.id).status, 'completed');
+});

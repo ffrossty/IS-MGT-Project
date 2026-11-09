@@ -207,14 +207,51 @@ async function cancel(order, actor, reason) {
   return null;
 }
 
-function markReturned(order, admin) {
-  const now = Date.now();
+function returnMethodsFor(order) {
+  return L.EXPRESS_ONLY_RETURN_PROVINCES.includes(order.province) ? ['express'] : ['ems', 'express'];
+}
+
+/** Customer tells the shop how the clothes are being sent back (can be updated until the shop receives them). */
+async function submitReturn(order, user, { method, tracking, note }) {
   const o = getOrder(order.id);
   assertStatus(o, ['confirmed']);
-  db.prepare("UPDATE orders SET status = 'returned', returned_at = ?, updated_at = ? WHERE id = ?").run(now, now, o.id);
-  const late = getItems(o.id).some((i) => i.due_at < now);
-  orderEvent(o.id, admin, 'returned', `รับคืนชุดแล้ว${late ? ' (คืนล่าช้ากว่ากำหนด)' : ''} — อยู่ระหว่างตรวจสอบ/ทำความสะอาด`);
+  const allowed = returnMethodsFor(o);
+  if (!allowed.includes(method)) {
+    throw new BookingError(allowed.length === 1 ? `ลูกค้าใน${o.province}ต้องส่งคืนแบบ${L.RETURN_METHOD.express}เท่านั้น` : 'กรุณาเลือกวิธีส่งคืน');
+  }
+  const t = String(tracking || '').trim().slice(0, 500);
+  if (t.length < 3) throw new BookingError('กรุณาใส่เลขพัสดุหรือลิงก์ติดตามการจัดส่ง');
+  const n = String(note || '').trim().slice(0, 500) || null;
+  const first = !o.return_submitted_at;
+  const now = Date.now();
+  db.prepare('UPDATE orders SET return_method = ?, return_tracking = ?, return_note = ?, return_submitted_at = ?, updated_at = ? WHERE id = ?')
+    .run(method, t, n, now, now, o.id);
+  orderEvent(o.id, user, 'return_submitted', `${first ? 'ลูกค้าแจ้งส่งคืนชุด' : 'ลูกค้าแก้ไขข้อมูลส่งคืน'}: ${L.RETURN_METHOD[method]} · ${t}${n ? ` · หมายเหตุ: ${n}` : ''}`);
   sheets.markDirty(o.id);
+  Promise.resolve(line.adminReturnSubmitted(getOrder(o.id), first)).catch((e) => console.error('[line] admin alert', e.message));
+  return getOrder(o.id);
+}
+
+/**
+ * Shop received the clothes. Each item stays unavailable for its cleaning buffer counted from now
+ * (frees stock early on early returns, protects it on late returns); the order then completes by itself.
+ */
+function markReturned(order, admin) {
+  const now = Date.now();
+  db.transaction(() => {
+    const o = getOrder(order.id);
+    assertStatus(o, ['confirmed']);
+    db.prepare("UPDATE orders SET status = 'returned', returned_at = ?, updated_at = ? WHERE id = ?").run(now, now, o.id);
+    for (const it of getItems(o.id)) {
+      const p = db.prepare('SELECT buffer_before_hours, buffer_after_hours FROM products WHERE id = ?').get(it.product_id);
+      const after = A.productBuffers(p).after;
+      db.prepare('UPDATE order_items SET block_end = ? WHERE id = ?').run(Math.max(now + after * 3600000, it.block_start + 1), it.id);
+    }
+    const late = getItems(o.id).some((i) => i.due_at < now);
+    const until = Math.max(...getItems(o.id).map((i) => i.block_end));
+    orderEvent(o.id, admin, 'returned', `รับคืนชุดแล้ว${late ? ' (คืนล่าช้ากว่ากำหนด)' : ''} — ตรวจสอบ/ทำความสะอาดถึง ${T.dt(until)} แล้วระบบจะปิดออเดอร์ให้อัตโนมัติ`);
+  }).immediate();
+  sheets.markDirty(order.id);
 }
 
 function markCompleted(order, admin) {
@@ -308,6 +345,18 @@ async function runReturnReminders(now = Date.now()) {
   return { sent };
 }
 
+/** Returned orders whose cleaning period has ended become 'completed' automatically. */
+function runAutoComplete(now = Date.now()) {
+  const done = db.prepare(`SELECT o.id FROM orders o WHERE o.status = 'returned'
+    AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.block_end > ?)`).all(now);
+  for (const { id } of done) {
+    db.prepare("UPDATE orders SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ? AND status = 'returned'").run(now, now, id);
+    orderEvent(id, SYSTEM, 'completed', 'ครบช่วงตรวจสอบ/ทำความสะอาด — ชุดพร้อมให้เช่าต่อ ระบบปิดออเดอร์อัตโนมัติ');
+    sheets.markDirty(id);
+  }
+  return { completed: done.length };
+}
+
 function runExpiryJob(now = Date.now()) {
   const expired = db.prepare("SELECT id FROM orders WHERE status = 'awaiting_payment' AND hold_expires_at <= ?").all(now);
   const autoExpire = getSettings().auto_expire_unreviewed === '1';
@@ -331,4 +380,4 @@ function runExpiryJob(now = Date.now()) {
   return { expired: expired.length, overdue: overdue.length };
 }
 
-module.exports = { BookingError, evaluateCart, shippingFee, createOrderFromCart, uploadSlip, approve, reject, requestNewSlip, cancel, markReturned, markCompleted, updateShipping, editItem, runExpiryJob, runReturnReminders, getOrder, getOrderByCode, getItems };
+module.exports = { BookingError, evaluateCart, shippingFee, createOrderFromCart, uploadSlip, approve, reject, requestNewSlip, cancel, markReturned, markCompleted, updateShipping, editItem, runExpiryJob, runReturnReminders, runAutoComplete, submitReturn, returnMethodsFor, getOrder, getOrderByCode, getItems };

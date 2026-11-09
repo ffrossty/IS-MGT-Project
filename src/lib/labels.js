@@ -27,6 +27,13 @@ const SHIPPING_STATUS = {
 };
 const SHIPPING_ORDER = ['preparing', 'shipped', 'in_transit', 'delivered'];
 
+const RETURN_METHOD = {
+  ems: 'ไปรษณีย์ไทย EMS',
+  express: 'ส่งด่วน (Grab / Lalamove)',
+};
+// provinces where customers must return by express delivery only
+const EXPRESS_ONLY_RETURN_PROVINCES = ['กรุงเทพมหานคร'];
+
 const SHIPPING_METHOD = {
   ems: 'ไปรษณีย์ไทย EMS',
   express: 'Express Delivery (Grab / Lalamove)',
@@ -49,7 +56,8 @@ const NOTIFICATION_TYPE = {
   order_rejected: 'ปฏิเสธคำสั่งจอง',
   order_cancelled: 'ยกเลิกคำสั่งซื้อ',
   return_reminder: 'เตือนก่อนครบกำหนดคืน',
+  admin_return_submitted: 'แจ้งแอดมิน: ลูกค้าส่งคืน',
   admin_slip_uploaded: 'แจ้งแอดมิน: สลิปรอตรวจ',
 };
 
-module.exports = { NOTIFICATION_TYPE, ORDER_STATUS, PAYMENT_STATUS, SHIPPING_STATUS, SHIPPING_ORDER, SHIPPING_METHOD, BLOCK_REASON, PROVINCES };
+module.exports = { RETURN_METHOD, EXPRESS_ONLY_RETURN_PROVINCES, NOTIFICATION_TYPE, ORDER_STATUS, PAYMENT_STATUS, SHIPPING_STATUS, SHIPPING_ORDER, SHIPPING_METHOD, BLOCK_REASON, PROVINCES };

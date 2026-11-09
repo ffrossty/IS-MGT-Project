@@ -15,9 +15,10 @@
         <td><%= baht(o.total) %></td>
         <td><%- h.orderBadge(o.status) %></td>
         <td><%- h.shippingBadge(o.shipping_status) %></td>
-        <td class="right">
+        <td class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:0">
           <% if (o.status === 'awaiting_payment') { %><a class="btn sm accent" href="/orders/<%= o.code %>/pay">ชำระเงิน</a>
           <% } else { %><a class="btn sm secondary" href="/orders/<%= o.code %>">ดูสถานะ</a><% } %>
+          <% if (o.status === 'confirmed') { %><a class="btn sm <%= o.return_submitted_at ? 'secondary' : 'accent' %>" href="/orders/<%= o.code %>/return" style="margin-top:6px"><%= o.return_submitted_at ? 'แก้ไขการส่งคืน' : 'ส่งคืนชุด' %></a><% } %>
         </td>
       </tr>
     <% }) %>

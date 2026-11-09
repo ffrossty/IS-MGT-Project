@@ -1,0 +1,54 @@
+<%- include('../partials/header') %>
+<div class="container narrow" style="padding-top:30px">
+  <div class="small muted"><a class="link" href="/orders">คำสั่งจองของฉัน</a> / <a class="link" href="/orders/<%= o.code %>"><%= o.code %></a></div>
+  <h1 style="margin-top:8px">ส่งคืนชุด</h1>
+
+  <div class="card">
+    <h3>ชุดที่ต้องส่งคืน</h3>
+    <% items.forEach(i => { %>
+      <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line-2)">
+        <span><strong><%= i.product_name %></strong> (ไซส์ <%= i.size_label %>) ×<%= i.qty %></span>
+        <span class="small">คืนภายใน <strong><%= T.dt(i.due_at) %></strong><% if (i.due_at < Date.now()) { %> <span class="badge bad">เลยกำหนด</span><% } %></span>
+      </div>
+    <% }) %>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>ที่อยู่สำหรับส่งคืน</h3>
+    <% if (settings.return_address) { %>
+      <div class="code-box" style="font-family:var(--font);font-size:.95rem;white-space:pre-line"><strong><%= settings.return_name %></strong><% if (settings.return_phone) { %> · โทร <%= settings.return_phone %><% } %>
+<%= settings.return_address %></div>
+      <p class="small muted" style="margin-top:8px">กรุณาใส่ชุดในถุงหรือกล่องที่ร้านส่งไปให้ และใส่ชื่อ/เลขคำสั่งซื้อ <span class="mono"><%= o.code %></span> ไว้ด้านใน</p>
+    <% } else { %>
+      <div class="flash warn" style="margin:0">ร้านยังไม่ได้ระบุที่อยู่สำหรับส่งคืน กรุณาติดต่อร้าน<%= settings.shop_phone ? ` (โทร ${settings.shop_phone})` : '' %></div>
+    <% } %>
+  </div>
+
+  <form class="card" method="post" action="/orders/<%= o.code %>/return" style="margin-top:16px">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <h3>แจ้งการส่งคืน</h3>
+    <div class="field">
+      <label class="req">วิธีส่งคืน</label>
+      <% methods.forEach(m => { %>
+        <label class="ship-option">
+          <input type="radio" name="return_method" value="<%= m %>" required <%= (form.return_method || methods[0]) === m ? 'checked' : '' %>>
+          <strong><%= L.RETURN_METHOD[m] %></strong>
+          <div class="sub"><%= m === 'express' ? 'เรียกรถจากแอป Grab หรือ Lalamove ให้มาส่งที่ร้าน ลูกค้าชำระค่าส่งเอง' : 'ส่งพัสดุ EMS ที่ไปรษณีย์ ลูกค้าชำระค่าส่งเอง' %></div>
+        </label>
+      <% }) %>
+      <% if (methods.length === 1) { %><p class="small muted">ลูกค้าในพื้นที่<%= o.province %> ต้องส่งคืนแบบส่งด่วนเท่านั้น เพื่อให้ชุดถึงร้านตรงเวลา</p><% } %>
+    </div>
+    <div class="field">
+      <label for="return_tracking" class="req">เลขพัสดุ หรือ ลิงก์ติดตามการจัดส่ง</label>
+      <input type="text" id="return_tracking" name="return_tracking" required minlength="3" maxlength="500" value="<%= form.return_tracking || '' %>" placeholder="เช่น ลิงก์แชร์ตำแหน่งจาก Grab/Lalamove หรือเลข EMS เช่น EF123456789TH">
+      <div class="hint">ร้านจะใช้ข้อมูลนี้ติดตามว่าชุดกำลังเดินทางมาถึงไหน</div>
+    </div>
+    <div class="field">
+      <label for="return_note">ข้อความถึงร้าน (ไม่บังคับ)</label>
+      <textarea id="return_note" name="return_note" maxlength="500" placeholder="เช่น คนขับชื่อ… / ทะเบียนรถ… / ถึงประมาณกี่โมง"><%= form.return_note || '' %></textarea>
+    </div>
+    <button class="btn block" data-busy="กำลังส่งข้อมูล…"><%= o.return_submitted_at ? 'บันทึกการแก้ไข' : 'ยืนยันการส่งคืน' %></button>
+    <% if (o.return_submitted_at) { %><p class="small muted center" style="margin-top:8px">แจ้งไปแล้วเมื่อ <%= T.dt(o.return_submitted_at) %> — แก้ไขได้จนกว่าร้านจะได้รับชุด</p><% } %>
+  </form>
+</div>
+<%- include('../partials/footer') %>

@@ -69,7 +69,22 @@
       </div>
     </div>
 
-    <aside class="card">
+    <aside class="stack">
+    <% if (o.status === 'confirmed' || o.return_submitted_at) { %>
+      <div class="card">
+        <div class="card-title"><h3>การส่งคืนชุด</h3><% if (o.status !== 'confirmed') { %><span class="badge ok">ร้านได้รับชุดแล้ว</span><% } else if (o.return_submitted_at) { %><span class="badge info">แจ้งส่งคืนแล้ว</span><% } %></div>
+        <% if (o.return_submitted_at) { %>
+          <dl class="kv small">
+            <dt>วิธีส่งคืน</dt><dd><%= L.RETURN_METHOD[o.return_method] %></dd>
+            <dt>ติดตาม</dt><dd style="word-break:break-all"><%- h.trackingHtml(o.return_tracking) %></dd>
+            <% if (o.return_note) { %><dt>หมายเหตุ</dt><dd><%= o.return_note %></dd><% } %>
+            <dt>แจ้งเมื่อ</dt><dd><%= T.dt(o.return_submitted_at) %></dd>
+          </dl>
+        <% } else { %><p class="small muted">ส่งชุดคืนแล้ว กดปุ่มด้านล่างเพื่อแจ้งร้านพร้อมเลขพัสดุ/ลิงก์ติดตาม</p><% } %>
+        <% if (o.status === 'confirmed') { %><a class="btn <%= o.return_submitted_at ? 'secondary' : '' %> block" style="margin-top:10px" href="/orders/<%= o.code %>/return"><%= o.return_submitted_at ? 'แก้ไขข้อมูลส่งคืน' : 'ส่งคืนชุด' %></a><% } %>
+      </div>
+    <% } %>
+    <div class="card">
       <h3>ความคืบหน้า</h3>
       <ul class="timeline">
         <% events.forEach((e, i) => { %>
@@ -85,6 +100,7 @@
       <% if (o.status === 'confirmed' && user.is_friend === 0 && config.oaBasicId) { %>
         <p class="small muted">เพิ่มเพื่อน <a class="link" href="https://line.me/R/ti/p/<%= encodeURIComponent(config.oaBasicId) %>"><%= config.oaBasicId %></a> เพื่อรับแจ้งเตือนการจัดส่ง</p>
       <% } %>
+    </div>
     </aside>
   </div>
 </div>

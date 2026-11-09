@@ -214,6 +214,10 @@ function addColumn(table, col, type) {
   if (!cols.includes(col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
 }
 addColumn('order_items', 'return_reminded_at', 'INTEGER');   // return-deadline reminder already sent
+addColumn('orders', 'return_method', 'TEXT');          // customer's return shipment: ems | express
+addColumn('orders', 'return_tracking', 'TEXT');        // tracking number / link given by the customer
+addColumn('orders', 'return_note', 'TEXT');
+addColumn('orders', 'return_submitted_at', 'INTEGER');
 
 const DEFAULT_SETTINGS = {
   shop_name: 'GMD Rental',
@@ -236,6 +240,10 @@ const DEFAULT_SETTINGS = {
   pickup_end_hour: '18',
   min_advance_hours: '3',          // booking must start at least this far ahead
   return_reminder_hours: '3',      // LINE the customer this long before the return deadline (0 = off)
+  return_name: 'GMD Rental',       // where customers send the clothes back
+  return_phone: '',
+  return_address: '',
+  notify_admin_return: '1',        // LINE admins when a customer submits return shipping info
   max_advance_days: '180',
   duration_options: '1,2,3,4,5,7',
   rental_terms: 'ลูกค้าต้องส่งคืนชุดภายในวันและเวลาที่กำหนด หากคืนล่าช้ามีค่าปรับตามเงื่อนไขของร้าน\nห้ามซักหรือรีดชุดเอง ร้านเป็นผู้ทำความสะอาด\nกรณีชุดเสียหายหรือสูญหาย ร้านจะประเมินค่าเสียหายตามจริง',

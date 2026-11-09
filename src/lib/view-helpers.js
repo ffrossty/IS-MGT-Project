@@ -16,6 +16,11 @@ function shippingBadge(status) {
   const tone = { preparing: 'warn', shipped: 'info', in_transit: 'info', delivered: 'ok' }[status];
   return `<span class="badge ${tone}">${esc(L.SHIPPING_STATUS[status].th)}</span>`;
 }
+/** Show customer-entered tracking text; http(s) URLs become links (other schemes stay plain text). */
+function trackingHtml(text) {
+  const t = String(text || '');
+  return esc(t).replace(/https?:\/\/[^\s<>"']+/g, (u) => `<a class="link" href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
+}
 function img(filename) { return filename ? `/media/products/${encodeURIComponent(filename)}` : '/static/img/placeholder.svg'; }
 function qs(query, patch) {
   const q = { ...query, ...patch };
@@ -24,4 +29,4 @@ function qs(query, patch) {
   return s ? `?${s}` : '?';
 }
 
-module.exports = { esc, orderBadge, paymentBadge, shippingBadge, img, qs };
+module.exports = { trackingHtml, esc, orderBadge, paymentBadge, shippingBadge, img, qs };

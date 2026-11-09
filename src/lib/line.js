@@ -161,8 +161,20 @@ function returnReminder(order, items, now = Date.now()) {
   let text = `⏰ ${st.shop_name}: ใกล้ถึงกำหนดคืนชุด (อีกประมาณ ${left})\nหมายเลขคำสั่งซื้อ: ${order.code}\n\n${lines}\n\n`
     + 'กรุณาส่งคืนชุดภายในเวลาที่กำหนด หากคืนล่าช้าอาจมีค่าปรับตามเงื่อนไขของร้าน\n';
   if (st.shop_phone) text += `ติดต่อร้าน: ${st.shop_phone}\n`;
-  text += `รายละเอียด: ${config.baseUrl}/orders/${order.code}`;
+  text += `ส่งคืนแล้ว แจ้งเลขพัสดุ/ลิงก์ติดตามได้ที่: ${config.baseUrl}/orders/${order.code}/return`;
   return notify(order, 'return_reminder', text);
 }
 
-module.exports = { returnReminder, adminSlipUploaded, buildAuthorizeUrl, handleCallback, callbackUrl, bookingConfirmed, shipped, slipRejected, orderRejected, orderCancelled, push };
+function adminReturnSubmitted(order, first = true) {
+  if (getSettings().notify_admin_return !== '1') return null;
+  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(order.id);
+  const L = require('./labels');
+  const text = `📦↩️ ${first ? 'ลูกค้าแจ้งส่งคืนชุด' : 'ลูกค้าแก้ไขข้อมูลส่งคืน'} ${order.code}\nลูกค้า: ${order.recipient_name} · ${order.phone}\n\n`
+    + items.map((i) => `• ${i.product_name} (ไซส์ ${i.size_label}) x${i.qty} — กำหนดคืน ${T.dt(i.due_at)}`).join('\n')
+    + `\n\nวิธีส่งคืน: ${L.RETURN_METHOD[order.return_method] || order.return_method}\nติดตาม: ${order.return_tracking}`
+    + (order.return_note ? `\nหมายเหตุ: ${order.return_note}` : '')
+    + `\n\nเมื่อได้รับชุดแล้ว กด "บันทึกรับคืนชุด": ${config.baseUrl}/admin/orders/${order.code}`;
+  return notifyAdmins(order, 'admin_return_submitted', text);
+}
+
+module.exports = { adminReturnSubmitted, returnReminder, adminSlipUploaded, buildAuthorizeUrl, handleCallback, callbackUrl, bookingConfirmed, shipped, slipRejected, orderRejected, orderCancelled, push };

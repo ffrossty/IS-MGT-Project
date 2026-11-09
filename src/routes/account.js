@@ -66,6 +66,19 @@ router.post('/orders/:code/slip', requireLogin, ownOrder, slipUpload.single('sli
   res.redirect(`/orders/${req.order.code}`);
 });
 
+router.get('/orders/:code/return', requireLogin, ownOrder, (req, res) => {
+  if (req.order.status !== 'confirmed') { res.flash('info', 'คำสั่งซื้อนี้ไม่อยู่ในสถานะที่ต้องส่งคืน'); return res.redirect(`/orders/${req.order.code}`); }
+  res.render('account/return', { title: 'ส่งคืนชุด', o: req.order, items: O.getItems(req.order.id), methods: O.returnMethodsFor(req.order), form: req.order });
+});
+
+router.post('/orders/:code/return', requireLogin, ownOrder, async (req, res, next) => {
+  try {
+    await O.submitReturn(req.order, req.user, { method: req.body.return_method, tracking: req.body.return_tracking, note: req.body.return_note });
+    res.flash('success', 'แจ้งส่งคืนชุดเรียบร้อย ร้านจะตรวจรับและแจ้งสถานะให้ทราบ');
+    res.redirect(`/orders/${req.order.code}`);
+  } catch (e) { next(e); }
+});
+
 router.post('/orders/:code/cancel', requireLogin, ownOrder, async (req, res, next) => {
   try { await O.cancel(req.order, req.user, 'ลูกค้ายกเลิกเอง'); } catch (e) { return next(e); }
   res.flash('success', 'ยกเลิกคำสั่งจองแล้ว');

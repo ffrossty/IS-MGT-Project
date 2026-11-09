@@ -89,6 +89,26 @@
     </div>
 
     <div class="card">
+      <div class="card-title"><h3>การส่งคืนจากลูกค้า</h3>
+        <% if (['returned','completed'].includes(o.status)) { %><span class="badge ok">รับคืนแล้ว<%= o.returned_at ? ' · ' + T.dt(o.returned_at) : '' %></span>
+        <% } else if (o.return_submitted_at) { %><span class="badge info">ลูกค้ากำลังส่งคืน</span>
+        <% } else { %><span class="badge muted">ยังไม่แจ้ง</span><% } %></div>
+      <% if (o.return_submitted_at) { %>
+        <dl class="kv">
+          <dt>วิธีส่งคืน</dt><dd><%= L.RETURN_METHOD[o.return_method] %></dd>
+          <dt>ติดตามการจัดส่ง</dt><dd style="word-break:break-all"><%- h.trackingHtml(o.return_tracking) %></dd>
+          <% if (o.return_note) { %><dt>ข้อความจากลูกค้า</dt><dd><%= o.return_note %></dd><% } %>
+          <dt>แจ้งเมื่อ</dt><dd><%= T.dt(o.return_submitted_at) %></dd>
+          <dt>กำหนดคืน</dt><dd><%= T.dt(Math.max(...items.map(i => i.due_at))) %></dd>
+        </dl>
+      <% } else if (o.status === 'confirmed') { %><p class="small muted">ลูกค้ายังไม่ได้แจ้งการส่งคืน (ลูกค้าแจ้งได้จากหน้า “คำสั่งจองของฉัน”)</p><% } %>
+      <% if (o.status === 'confirmed') { %>
+        <form method="post" action="/admin/orders/<%= o.code %>/returned" data-confirm="ยืนยันว่าได้รับชุดคืนครบแล้ว?" style="margin-top:12px"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn ok">ได้รับชุดคืนแล้ว — บันทึกรับคืนชุด</button></form>
+        <p class="small muted" style="margin-top:6px">หลังบันทึก ชุดจะอยู่ในช่วงตรวจสอบ/ทำความสะอาดตามเวลาที่ตั้งไว้ แล้วระบบปิดออเดอร์เป็น “เสร็จสิ้น” ให้อัตโนมัติ</p>
+      <% } %>
+    </div>
+
+    <div class="card">
       <h3>ประวัติการเปลี่ยนแปลง</h3>
       <ul class="event-list">
         <% events.forEach(e => { %>
