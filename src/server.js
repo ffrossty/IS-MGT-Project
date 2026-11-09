@@ -13,6 +13,11 @@ const L = require('./lib/labels');
 const { baht } = require('./lib/pricing');
 
 const app = express();
+// Cache-busting: asset URLs carry a hash of their content, so browsers fetch new JS/CSS after every deploy.
+const assetVersion = require('crypto').createHash('sha1')
+  .update(require('fs').readFileSync(path.join(__dirname, '..', 'public', 'js', 'app.js')))
+  .update(require('fs').readFileSync(path.join(__dirname, '..', 'public', 'css', 'style.css')))
+  .digest('hex').slice(0, 10);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
 if (config.isProd) app.set('trust proxy', 1);
@@ -55,7 +60,7 @@ app.use(loadUser);
 app.use((req, res, next) => {
   const s = getSettings();
   Object.assign(res.locals, {
-    settings: s, T, L, baht, h: require('./lib/view-helpers'),
+    settings: s, T, L, baht, assetVersion, h: require('./lib/view-helpers'),
     cartCount: req.user ? require('./db').db.prepare('SELECT COUNT(*) n FROM cart_items WHERE user_id = ?').get(req.user.id).n : 0,
     config: { devLogin: config.devLogin, lineLoginConfigured: config.lineLoginConfigured, oaBasicId: config.line.oaBasicId, baseUrl: config.baseUrl },
     path: req.path, flash: req.session.flash || null, query: req.query,
