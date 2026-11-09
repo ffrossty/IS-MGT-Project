@@ -14,9 +14,14 @@
     $$('[data-open-dialog]').forEach((b) => b.addEventListener('click', () => { const d = $(b.dataset.openDialog); if (d && d.showModal) d.showModal(); }));
     $$('[data-add-row]').forEach((b) => b.addEventListener('click', () => {
       const tb = $(b.dataset.addRow); const last = tb && tb.lastElementChild; if (!last) return;
-      const row = last.cloneNode(true); $$('input', row).forEach((i) => { i.value = i.type === 'number' ? '1' : ''; });
+      const row = last.cloneNode(true); $$('input', row).forEach((i) => { i.value = i.dataset.default || ''; });
       tb.appendChild(row); const first = $('input', row); if (first) first.focus();
     }));
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-remove-row]'); if (!b) return;
+      const tr = b.closest('tr'); const tb = tr.parentElement;
+      if (tb.children.length > 1) tr.remove(); else $$('input', tr).forEach((i) => { i.value = ''; });
+    });
     $$('[data-close-dialog]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
 
     // gallery
@@ -231,9 +236,9 @@
         box.className = 'avail-box ' + (enough ? 'ok' : r.held ? 'held' : 'bad');
         box.innerHTML = (enough ? `✓ ว่าง <strong>${r.available}</strong> ชิ้นในช่วงนี้` : (r.held ? '🟡 มีผู้จองช่วงนี้แล้ว · รอร้านยืนยันการชำระเงิน — หากไม่ได้รับการยืนยัน ชุดจะว่างอีกครั้ง' : r.available ? `ว่างเพียง <strong>${r.available}</strong> ชิ้น (ต้องการ ${want})` : '✕ ไม่ว่างในช่วงเวลานี้') + (r.nextLabel ? `<br><span class="small">ว่างอีกครั้งประมาณ <strong>${r.nextLabel}</strong> (เช่า ${days.value} วัน)</span>` : ''))
           + `<br><span class="small">เริ่ม ${r.startLabel} → <strong>คืนภายใน ${r.dueLabel}</strong> (${r.hours} ชม.)</span>`
-          + `<br><span class="small">ค่าเช่า ${baht(r.unitPrice)} × ${want} = <strong>${baht(r.unitPrice * want)}</strong></span>`;
-        const priceEl = $('[data-price]'); if (priceEl) priceEl.textContent = baht(r.unitPrice);
-        const note = $('[data-price-note]'); if (note) note.textContent = `/ ${days.value} วัน`;
+          + `<br><span class="small">ค่าเช่า ${r.listPrice > r.unitPrice ? `<s>${baht(r.listPrice)}</s> ` : ''}${baht(r.unitPrice)} × ${want} = <strong>${baht(r.unitPrice * want)}</strong>${r.promoLabel && r.listPrice > r.unitPrice ? ` <span class="promo-tag">${r.promoLabel}</span>` : ''}</span>`;
+        const priceEl = $('[data-price]'); if (priceEl) { priceEl.textContent = baht(r.unitPrice) + ` / ${days.value} วัน`; priceEl.classList.toggle('sale', r.listPrice > r.unitPrice); }
+        const was = $('[data-was]'); if (was) { was.textContent = baht(r.listPrice); was.hidden = !(r.listPrice > r.unitPrice); }
         setSubmit(enough);
       } catch (e) { box.textContent = 'ตรวจสอบไม่สำเร็จ กรุณาลองใหม่'; }
     }

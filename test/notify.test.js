@@ -252,3 +252,28 @@ test('next available = due + cleaning (+3 days for parcel orders) — the shop e
   assert.equal(T.toInputDateTime(n2.startAt), '2026-12-15T09:00', 'parcel: + 3 more days');
   setSettings({ buffer_before_hours: '24' });
 });
+
+test('pricing: price table by days, extra days, promotions (best one wins, no stacking, time window)', () => {
+  const P = require('../src/lib/pricing');
+  const { setSettings } = require('../src/db');
+  const now = Date.now();
+  const pid = db.prepare(`INSERT INTO products(name, base_price, base_days, extra_day_price, price_tiers, created_at, updated_at)
+    VALUES ('Tier dress', 350, 1, 50, ?, ?, ?)`).run(JSON.stringify([{ days: 3, price: 450 }, { days: 1, price: 350 }, { days: 5, price: 550 }]), now, now).lastInsertRowid;
+  const prod = () => db.prepare('SELECT * FROM products WHERE id = ?').get(pid);
+  assert.deepEqual([1, 2, 3, 4, 5, 7].map((d) => P.unitPrice(prod(), d)), [350, 400, 450, 500, 550, 650]);
+  // a SKU row works too (looks the product up)
+  assert.equal(P.unitPrice({ id: 999, product_id: pid, size_label: 'M' }, 3), 450);
+
+  db.prepare("UPDATE products SET promo_type = 'percent', promo_value = 10, promo_label = 'ลดปีใหม่' WHERE id = ?").run(pid);
+  let d = P.priceDetail(prod(), 1);
+  assert.equal(d.price, 315); assert.equal(d.original, 350); assert.equal(d.promo.label, 'ลดปีใหม่');
+  // shop-wide 100 baht off beats 10% on a 350 dress; they don't stack
+  setSettings({ shop_promo_type: 'amount', shop_promo_value: '100', shop_promo_start: '', shop_promo_end: '' });
+  assert.equal(P.unitPrice(prod(), 1), 250);
+  // promotion window: ended → no discount from the shop promo
+  setSettings({ shop_promo_end: String(now - 1000) });
+  assert.equal(P.unitPrice(prod(), 1), 315);
+  db.prepare('UPDATE products SET promo_start = ? WHERE id = ?').run(now + 86400000, pid);
+  assert.equal(P.unitPrice(prod(), 1), 350, 'product promo not started yet');
+  setSettings({ shop_promo_type: '', shop_promo_value: '', shop_promo_end: '' });
+});

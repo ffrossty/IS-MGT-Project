@@ -220,6 +220,13 @@ addColumn('orders', 'return_note', 'TEXT');
 addColumn('orders', 'return_submitted_at', 'INTEGER');
 addColumn('orders', 'return_carrier', 'TEXT');         // parcel company chosen by the customer for the return
 addColumn('orders', 'shipping_carrier', 'TEXT');       // parcel company the shop used to ship
+addColumn('products', 'price_tiers', 'TEXT');          // JSON [{days, price}] — price table by rental length
+addColumn('products', 'promo_type', 'TEXT');           // percent | amount | NULL
+addColumn('products', 'promo_value', 'INTEGER');
+addColumn('products', 'promo_start', 'INTEGER');
+addColumn('products', 'promo_end', 'INTEGER');
+addColumn('products', 'promo_label', 'TEXT');
+addColumn('order_items', 'list_price', 'INTEGER');     // price before promotion (for records)
 db.prepare("UPDATE orders SET return_method = 'parcel', return_carrier = COALESCE(return_carrier, 'ไปรษณีย์ไทย EMS') WHERE return_method = 'ems'").run();
 
 const DEFAULT_SETTINGS = {
@@ -248,6 +255,11 @@ const DEFAULT_SETTINGS = {
   return_phone: '',
   return_address: '',
   notify_admin_return: '1',        // LINE admins when a customer submits return shipping info
+  shop_promo_type: '',             // shop-wide promotion: percent | amount | ''
+  shop_promo_value: '',
+  shop_promo_start: '',            // epoch ms ('' = no limit)
+  shop_promo_end: '',
+  shop_promo_label: '',
   max_advance_days: '180',
   duration_options: '1,2,3,4,5,7',
   rental_terms: 'ลูกค้าต้องส่งคืนชุดภายในวันและเวลาที่กำหนด หากคืนล่าช้ามีค่าปรับตามเงื่อนไขของร้าน\nห้ามซักหรือรีดชุดเอง ร้านเป็นผู้ทำความสะอาด\nกรณีชุดเสียหายหรือสูญหาย ร้านจะประเมินค่าเสียหายตามจริง',

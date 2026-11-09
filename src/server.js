@@ -60,7 +60,7 @@ app.use(loadUser);
 app.use((req, res, next) => {
   const s = getSettings();
   Object.assign(res.locals, {
-    settings: s, T, L, baht, assetVersion, h: require('./lib/view-helpers'),
+    settings: s, T, L, baht, assetVersion, pricing: require('./lib/pricing'), h: require('./lib/view-helpers'),
     cartCount: req.user ? require('./db').db.prepare('SELECT COUNT(*) n FROM cart_items WHERE user_id = ?').get(req.user.id).n : 0,
     config: { devLogin: config.devLogin, lineLoginConfigured: config.lineLoginConfigured, oaBasicId: config.line.oaBasicId, baseUrl: config.baseUrl },
     path: req.path, flash: req.session.flash || null, query: req.query,

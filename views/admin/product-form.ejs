@@ -25,7 +25,7 @@
           <% }) %>
         </tbody>
         <tbody id="new-sizes">
-          <tr><td><input type="text" name="new_size[]" placeholder="<%= skus.length ? 'ไซส์ใหม่ เช่น XL' : 'เช่น Free size / S / M' %>" maxlength="30"></td><td><input type="number" name="new_qty[]" value="1" min="0"></td><td></td></tr>
+          <tr><td><input type="text" name="new_size[]" placeholder="<%= skus.length ? 'ไซส์ใหม่ เช่น XL' : 'เช่น Free size / S / M' %>" maxlength="30"></td><td><input type="number" name="new_qty[]" value="1" min="0" data-default="1"></td><td></td></tr>
         </tbody>
       </table>
       <p class="small muted">สต็อก = จำนวนชุดจริงที่ร้านมีในไซส์นั้น ระบบคำนวณจำนวนว่างตามช่วงเวลาจากการจองอัตโนมัติ · ปิดชุดชั่วคราว (ซ่อม/ซัก) ได้ที่หน้า <strong>ปฏิทิน</strong></p>
@@ -50,13 +50,37 @@
   </div>
 
   <div class="stack" style="position:sticky;top:80px">
+    <% const tierRows = pricing.tiers(p.id ? p : { price_tiers: p.price_tiers, promo_type: null, base_days: 1, base_price: 0 }); %>
     <div class="card">
-      <h3>ราคาเช่า</h3>
+      <div class="card-title"><h3>ราคาเช่า</h3><button type="button" class="btn sm secondary" data-add-row="#tier-rows">+ เพิ่มแถว</button></div>
+      <table class="table">
+        <thead><tr><th>จำนวนวัน</th><th>ราคา (บาท)</th><th></th></tr></thead>
+        <tbody id="tier-rows">
+          <% tierRows.forEach(t => { %>
+            <tr><td><input type="number" name="tier_days[]" value="<%= t.days %>" min="1" style="width:90px"></td>
+              <td><input type="number" name="tier_price[]" value="<%= t.price %>" min="0"></td>
+              <td><button type="button" class="btn sm ghost" data-remove-row title="ลบแถว">✕</button></td></tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <div class="field" style="margin-top:12px"><label>ค่าเช่าวันที่เกินจากตาราง (บาท/วัน)</label><input type="number" name="extra_day_price" value="<%= p.extra_day_price || 0 %>" min="0">
+        <div class="hint">ใช้เมื่อลูกค้าเลือกจำนวนวันที่ไม่มีในตาราง เช่น ตาราง 1 วัน 350 · 3 วัน 450 + วันละ 50 → เช่า 4 วัน = 500 บาท · ลบแถวให้เว้นช่องราคาว่าง</div></div>
+    </div>
+
+    <div class="card">
+      <h3>โปรโมชั่นชุดนี้</h3>
       <div class="form-grid">
-        <div class="field"><label class="req">ราคาเช่า (บาท)</label><input type="number" name="base_price" value="<%= p.base_price || 0 %>" min="0" required></div>
-        <div class="field"><label class="req">สำหรับ (วัน)</label><input type="number" name="base_days" value="<%= p.base_days || 3 %>" min="1" required></div>
+        <div class="field"><label>ส่วนลด</label><select name="promo_type" data-promo-type>
+          <option value="">ไม่มีโปรโมชั่น</option>
+          <option value="percent" <%= p.promo_type === 'percent' ? 'selected' : '' %>>ลดเป็น %</option>
+          <option value="amount" <%= p.promo_type === 'amount' ? 'selected' : '' %>>ลดเป็นบาท</option></select></div>
+        <div class="field"><label>มูลค่าส่วนลด</label><input type="number" name="promo_value" min="0" value="<%= p.promo_value || '' %>" placeholder="เช่น 10"></div>
+        <div class="field"><label>เริ่ม (ไม่บังคับ)</label><input type="datetime-local" name="promo_start" value="<%= p.promo_start ? T.toInputDateTime(p.promo_start) : '' %>"></div>
+        <div class="field"><label>สิ้นสุด (ไม่บังคับ)</label><input type="datetime-local" name="promo_end" value="<%= p.promo_end ? T.toInputDateTime(p.promo_end) : '' %>"></div>
+        <div class="field full"><label>ชื่อโปรโมชั่น (แสดงให้ลูกค้าเห็น)</label><input type="text" name="promo_label" maxlength="60" value="<%= p.promo_label || '' %>" placeholder="เช่น ลดรับปีใหม่"></div>
       </div>
-      <div class="field"><label>ค่าเช่าวันถัดไป (บาท/วัน)</label><input type="number" name="extra_day_price" value="<%= p.extra_day_price || 0 %>" min="0"><div class="hint">ตัวอย่าง: 1,500 บาท/3 วัน + 300 บาท/วัน → เช่า 5 วัน = 2,100 บาท</div></div>
+      <p class="hint small muted">ลดจากทุกแถวในตารางราคา · ถ้ามีโปรทั้งร้านด้วย ลูกค้าได้ส่วนลดที่มากกว่า (ไม่ลดซ้อน) · โปรทั้งร้านตั้งได้ที่ ตั้งค่าร้าน</p>
+      <% if (p.id) { const d = pricing.priceDetail(p, tierRows[0].days); if (d.promo) { %><p class="small" style="color:var(--ok)">ตอนนี้ลูกค้าเห็น: <s class="muted"><%= baht(d.original) %></s> <strong><%= baht(d.price) %></strong> / <%= tierRows[0].days %> วัน</p><% } } %>
     </div>
     <div class="card">
       <h3>เวลาเตรียมชุด & ทำความสะอาด</h3>

@@ -132,7 +132,8 @@
             <div class="meta">
               <div class="cat"><%= p.category_name || 'Collection' %></div>
               <div class="title"><%= p.name %></div>
-              <div class="price"><%= baht(p.price) %> <small>/ <%= rental.days && !rentalError ? rental.days : p.base_days %> วัน</small></div>
+              <div class="price"><% if (p.promo) { %><span class="sale"><%= baht(p.price) %></span> <s class="was"><%= baht(p.originalPrice) %></s><% } else { %><%= baht(p.price) %><% } %> <small>/ <%= p.priceDays %> วัน</small>
+                <% if (p.promo) { %><span class="promo-tag">-<%= p.percentOff %>%<%= p.promo.label ? ' · ' + p.promo.label : '' %></span><% } %></div>
               <div class="sizes">
                 <% p.sizes.forEach(s => { %><span class="size-pill <%= (s.available !== null ? s.available < qtyNeeded : s.stock === 0) ? 'off' : '' %>"><%= s.label %></span><% }) %>
               </div>

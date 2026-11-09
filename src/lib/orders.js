@@ -2,7 +2,7 @@
 const crypto = require('crypto');
 const { db, settingNum, getSettings } = require('../db');
 const A = require('./availability');
-const { unitPrice } = require('./pricing');
+const { unitPrice, listPrice } = require('./pricing');
 const { orderEvent } = require('./audit');
 const line = require('./line');
 const sheets = require('./sheets');
@@ -61,7 +61,7 @@ function evaluateCart(userId, now = Date.now()) {
       available = Math.max(0, available);
       if (!error && available < r.qty) error = available === 0 ? 'ไม่ว่างในช่วงเวลาที่เลือก' : `ว่างเพียง ${available} ชิ้นในช่วงเวลานี้`;
     }
-    lines.push({ ...r, window: w, unitPrice: price, lineTotal: price * r.qty, available, error });
+    lines.push({ ...r, window: w, unitPrice: price, listPrice: listPrice(sku, r.days), lineTotal: price * r.qty, available, error });
   }
   const subtotal = lines.reduce((a, l) => a + l.lineTotal, 0);
   return { lines, subtotal, ok: lines.length > 0 && lines.every((l) => !l.error) };
@@ -90,7 +90,7 @@ function createOrderFromCart(user, ship, now = Date.now()) {
     });
     const orderId = info.lastInsertRowid;
     const insItem = db.prepare(`INSERT INTO order_items(order_id, sku_id, product_id, product_name, size_label, qty, start_at, days, due_at,
-      block_start, block_end, unit_price, line_total) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+      block_start, block_end, unit_price, line_total, list_price) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     let subtotal = 0;
     const problems = [];
     for (const c of cart) {
@@ -103,7 +103,7 @@ function createOrderFromCart(user, ship, now = Date.now()) {
       const avail = A.availableQty(c.sku_id, w.blockStart, w.blockEnd, { sku, now });
       if (avail < c.qty) { problems.push(`${sku.product_name} (${sku.size_label}): ${avail === 0 ? 'ไม่ว่างในช่วงเวลาที่เลือก' : `ว่างเพียง ${avail} ชิ้น`}`); continue; }
       const price = unitPrice(sku, c.days);
-      insItem.run(orderId, sku.id, sku.product_id, sku.product_name, sku.size_label, c.qty, w.startAt, c.days, w.dueAt, w.blockStart, w.blockEnd, price, price * c.qty);
+      insItem.run(orderId, sku.id, sku.product_id, sku.product_name, sku.size_label, c.qty, w.startAt, c.days, w.dueAt, w.blockStart, w.blockEnd, price, price * c.qty, listPrice(sku, c.days));
       subtotal += price * c.qty;
     }
     if (problems.length) throw new BookingError('สินค้าบางรายการไม่สามารถจองได้', problems);
@@ -315,8 +315,8 @@ function editItem(order, itemId, admin, { startAt, days, qty }) {
     const avail = A.availableQty(item.sku_id, w.blockStart, w.blockEnd, { sku, excludeItemId: item.id });
     if (avail < qty) throw new BookingError(`สต็อกไม่พอในช่วงเวลาใหม่ (ว่าง ${avail} ชิ้น)`);
     const price = unitPrice(sku, days);
-    db.prepare(`UPDATE order_items SET start_at=?, days=?, due_at=?, block_start=?, block_end=?, qty=?, unit_price=?, line_total=?, return_reminded_at=NULL WHERE id=?`)
-      .run(w.startAt, days, w.dueAt, w.blockStart, w.blockEnd, qty, price, price * qty, item.id);
+    db.prepare(`UPDATE order_items SET start_at=?, days=?, due_at=?, block_start=?, block_end=?, qty=?, unit_price=?, line_total=?, list_price=?, return_reminded_at=NULL WHERE id=?`)
+      .run(w.startAt, days, w.dueAt, w.blockStart, w.blockEnd, qty, price, price * qty, listPrice(sku, days), item.id);
     const subtotal = db.prepare('SELECT SUM(line_total) s FROM order_items WHERE order_id = ?').get(o.id).s;
     db.prepare('UPDATE orders SET subtotal = ?, total = ? + shipping_fee, updated_at = ? WHERE id = ?').run(subtotal, subtotal, Date.now(), o.id);
     orderEvent(o.id, admin, 'item_edited', `แก้ไขการจอง ${item.product_name} (${item.size_label}): ${T.dt(item.start_at)}/${item.days} วัน/x${item.qty} → ${T.dt(w.startAt)}/${days} วัน/x${qty}`,

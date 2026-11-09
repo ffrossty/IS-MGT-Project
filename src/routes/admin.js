@@ -142,7 +142,7 @@ function productForm(req, res, p, status = 200) {
   res.status(status).render('admin/product-form', { title: p.id ? `แก้ไข: ${p.name}` : 'เพิ่มสินค้าใหม่', p, categories, images, skus, defaults: { before: getSettings().buffer_before_hours, after: getSettings().buffer_after_hours } });
 }
 
-router.get('/products/new', (req, res) => productForm(req, res, { is_active: 1, base_days: 3, conditions: '', size_chart: 'Size, อก (นิ้ว), เอว (นิ้ว), สะโพก (นิ้ว), ความยาว (นิ้ว)\n' }));
+router.get('/products/new', (req, res) => productForm(req, res, { is_active: 1, base_days: 1, price_tiers: JSON.stringify([{ days: 1, price: 350 }, { days: 3, price: 450 }, { days: 5, price: 550 }]), conditions: '', size_chart: 'Size, อก (นิ้ว), เอว (นิ้ว), สะโพก (นิ้ว), ความยาว (นิ้ว)\n' }));
 router.get('/products/:id', (req, res, next) => {
   const p = db.prepare('SELECT * FROM products WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
   if (!p) return next();
@@ -151,11 +151,31 @@ router.get('/products/:id', (req, res, next) => {
 
 function readProduct(b) {
   const opt = (v) => (v === '' || v == null ? null : Math.max(0, int(v)));
+  // price table rows (tier_days[] / tier_price[])
+  const days = [].concat(b.tier_days || []); const prices = [].concat(b.tier_price || []);
+  const map = new Map();
+  days.forEach((d, i) => {
+    const dd = int(d, 0); const pp = String(prices[i] ?? '').trim();
+    if (dd > 0 && pp !== '' && int(pp, -1) >= 0) map.set(dd, int(pp));
+  });
+  const tiers = [...map].map(([d, pr]) => ({ days: d, price: pr })).sort((a, c) => a.days - c.days);
+  if (!tiers.length) throw new O.BookingError('กรุณาใส่ราคาเช่าอย่างน้อย 1 แถว (จำนวนวัน + ราคา)');
+  const promoType = ['percent', 'amount'].includes(b.promo_type) ? b.promo_type : null;
+  const promoValue = promoType ? Math.max(0, int(b.promo_value)) : null;
+  if (promoType === 'percent' && promoValue > 100) throw new O.BookingError('ส่วนลดเปอร์เซ็นต์ต้องไม่เกิน 100%');
+  if (promoType && !promoValue) throw new O.BookingError('กรุณาใส่มูลค่าส่วนลด');
+  const promoStart = promoType && b.promo_start ? T.parseLocal(b.promo_start) : null;
+  const promoEnd = promoType && b.promo_end ? T.parseLocal(b.promo_end) : null;
+  if (promoStart && promoEnd && promoEnd <= promoStart) throw new O.BookingError('วันสิ้นสุดโปรโมชั่นต้องหลังวันเริ่ม');
   const p = {
     name: String(b.name || '').trim().slice(0, 150), category_id: int(b.category_id) || null,
     description: String(b.description || '').slice(0, 5000), conditions: String(b.conditions || '').slice(0, 5000),
-    size_chart: String(b.size_chart || '').slice(0, 5000), base_price: Math.max(0, int(b.base_price)),
-    base_days: Math.max(1, int(b.base_days, 3)), extra_day_price: Math.max(0, int(b.extra_day_price)),
+    size_chart: String(b.size_chart || '').slice(0, 5000),
+    price_tiers: JSON.stringify(tiers),
+    base_price: tiers[0].price, base_days: tiers[0].days,  // kept in sync for sorting / price filter
+    extra_day_price: Math.max(0, int(b.extra_day_price)),
+    promo_type: promoType, promo_value: promoValue, promo_start: promoStart, promo_end: promoEnd,
+    promo_label: promoType ? String(b.promo_label || '').trim().slice(0, 60) || null : null,
     buffer_before_hours: opt(b.buffer_before_hours), buffer_after_hours: opt(b.buffer_after_hours), is_active: b.is_active ? 1 : 0,
   };
   if (!p.name) throw new O.BookingError('กรุณากรอกชื่อสินค้า');
@@ -167,8 +187,10 @@ router.post('/products', productUpload.array('images', 12), (req, res) => {
   const now = Date.now();
   const id = db.transaction(() => {
     const info = db.prepare(`INSERT INTO products(name, category_id, description, conditions, size_chart, base_price, base_days, extra_day_price,
+      price_tiers, promo_type, promo_value, promo_start, promo_end, promo_label,
       buffer_before_hours, buffer_after_hours, is_active, created_at, updated_at) VALUES (@name, @category_id, @description, @conditions, @size_chart,
-      @base_price, @base_days, @extra_day_price, @buffer_before_hours, @buffer_after_hours, @is_active, @now, @now)`).run({ ...p, now });
+      @base_price, @base_days, @extra_day_price, @price_tiers, @promo_type, @promo_value, @promo_start, @promo_end, @promo_label,
+      @buffer_before_hours, @buffer_after_hours, @is_active, @now, @now)`).run({ ...p, now });
     const pid = info.lastInsertRowid;
     const labels = [].concat(req.body.new_size || []); const qtys = [].concat(req.body.new_qty || []);
     labels.forEach((lab, i) => { if (String(lab).trim()) db.prepare('INSERT INTO skus(product_id, size_label, stock_qty, sort) VALUES (?, ?, ?, ?)').run(pid, String(lab).trim().slice(0, 30), Math.max(0, int(qtys[i])), i); });
@@ -186,7 +208,8 @@ router.post('/products/:id', productUpload.array('images', 12), (req, res) => {
   const p = readProduct(req.body);
   db.transaction(() => {
     db.prepare(`UPDATE products SET name=@name, category_id=@category_id, description=@description, conditions=@conditions, size_chart=@size_chart,
-      base_price=@base_price, base_days=@base_days, extra_day_price=@extra_day_price, buffer_before_hours=@buffer_before_hours,
+      base_price=@base_price, base_days=@base_days, extra_day_price=@extra_day_price, price_tiers=@price_tiers,
+      promo_type=@promo_type, promo_value=@promo_value, promo_start=@promo_start, promo_end=@promo_end, promo_label=@promo_label, buffer_before_hours=@buffer_before_hours,
       buffer_after_hours=@buffer_after_hours, is_active=@is_active, updated_at=@now WHERE id=@id`).run({ ...p, now: Date.now(), id: before.id });
     // existing sizes
     for (const s of db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL').all(before.id)) {
@@ -464,6 +487,14 @@ router.post('/settings', settingsUpload.single('payment_qr'), (req, res) => {
   const allowed = Object.keys(DEFAULT_SETTINGS).filter((k) => k !== 'payment_qr_image');
   const next = {};
   for (const k of allowed) if (req.body[k] !== undefined) next[k] = String(req.body[k]).trim();
+  // shop-wide promotion
+  next.shop_promo_type = ['percent', 'amount'].includes(req.body.shop_promo_type) ? req.body.shop_promo_type : '';
+  next.shop_promo_value = next.shop_promo_type ? String(Math.max(0, int(req.body.shop_promo_value))) : '';
+  if (next.shop_promo_type === 'percent' && Number(next.shop_promo_value) > 100) throw new O.BookingError('ส่วนลดเปอร์เซ็นต์ต้องไม่เกิน 100%');
+  if (next.shop_promo_type && !Number(next.shop_promo_value)) throw new O.BookingError('กรุณาใส่มูลค่าส่วนลดของโปรโมชั่นทั้งร้าน');
+  next.shop_promo_start = next.shop_promo_type && req.body.shop_promo_start ? String(T.parseLocal(req.body.shop_promo_start) || '') : '';
+  next.shop_promo_end = next.shop_promo_type && req.body.shop_promo_end ? String(T.parseLocal(req.body.shop_promo_end) || '') : '';
+  next.shop_promo_label = next.shop_promo_type ? String(req.body.shop_promo_label || '').trim().slice(0, 60) : '';
   for (const k of ['auto_expire_unreviewed', 'notify_admin_slip', 'notify_admin_return']) next[k] = req.body[k] ? '1' : '0';
   for (const k of ['ems_fee', 'payment_hold_minutes', 'slip_reupload_minutes', 'return_reminder_hours', 'parcel_extra_hours', 'admin_review_hours', 'buffer_before_hours', 'buffer_after_hours', 'pickup_start_hour', 'pickup_end_hour', 'min_advance_hours', 'max_advance_days']) {
     if (next[k] !== undefined && !/^\d+$/.test(next[k])) throw new O.BookingError(`ค่า ${k} ต้องเป็นตัวเลข`);

@@ -5,7 +5,7 @@ const A = require('../lib/availability');
 const O = require('../lib/orders');
 const T = require('../lib/time');
 const L = require('../lib/labels');
-const { unitPrice } = require('../lib/pricing');
+const { unitPrice, priceDetail, tiers } = require('../lib/pricing');
 const { requireLogin } = require('../middleware/auth');
 const addr = require('../lib/thai-address');
 
@@ -65,7 +65,8 @@ function productCardData(p, rental, qtyNeeded = 1, sizeFilter = null) {
     }
     if (!rental.startAt) sizes = sizes.map((s) => ({ ...s, available: null }));
   }
-  return { ...p, image: image && image.filename, sizes, totalStock, availability, nextAt, price: unitPrice(p, rental.days || p.base_days) };
+  const pd = priceDetail(p, rental.days || tiers(p)[0].days);
+  return { ...p, image: image && image.filename, sizes, totalStock, availability, nextAt, price: pd.price, originalPrice: pd.original, promo: pd.promo, percentOff: pd.percentOff, priceDays: rental.days || tiers(p)[0].days };
 }
 
 function availabilityNote() {
@@ -121,8 +122,9 @@ router.get('/products/:id', (req, res, next) => {
   const sizeChart = parseSizeChart(p.size_chart);
   const buffers = A.productBuffers(p);
   const defaultTime = rental.time || `${T.pad(Number(getSettings().pickup_start_hour))}:00`;
+  const priceRows = A.durationOptions().map((d) => ({ days: d, ...priceDetail(p, d) }));
   res.render('shop/product', {
-    title: p.name, p, images, skus, sizeChart, buffers, rental, defaultTime, timeOptions: timeOptions(), durations: A.durationOptions(),
+    title: p.name, p, images, skus, sizeChart, buffers, rental, defaultTime, priceRows, firstPrice: priceDetail(p, (rental.days || tiers(p)[0].days)), timeOptions: timeOptions(), durations: A.durationOptions(),
     minDate: T.toInputDate(Date.now() + settingNum('min_advance_hours', 0) * T.HOUR),
   });
 });
@@ -149,7 +151,8 @@ router.get('/api/availability', (req, res) => {
     const n = held ? null : A.nextAvailable(sku, [sku], startAt, days, qty);
     nextLabel = n ? T.dt(n.startAt) : null;
   }
-  res.json({ ok: true, available, nextLabel, held, startLabel: T.dt(w.startAt), dueLabel: T.dt(w.dueAt), hours: w.hours, unitPrice: unitPrice(sku, days) });
+  const pd = priceDetail(sku, days);
+  res.json({ ok: true, available, nextLabel, held, startLabel: T.dt(w.startAt), dueLabel: T.dt(w.dueAt), hours: w.hours, unitPrice: pd.price, listPrice: pd.original, promoLabel: pd.promo ? (pd.promo.label || 'โปรโมชั่น') : null });
 });
 
 /** Month calendar: for each day, how many units are free if the rental starts that day at `time` for `days`. */

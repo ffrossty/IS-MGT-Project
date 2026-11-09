@@ -14,7 +14,7 @@
             <div class="row between" style="align-items:flex-start">
               <div>
                 <div style="font-family:var(--serif-th);font-size:1.05rem"><%= l.product_name %></div>
-                <div class="small muted">ไซส์ <%= l.size_label %> · <%= baht(l.unitPrice) %> × <%= l.qty %></div>
+                <div class="small muted">ไซส์ <%= l.size_label %> · <% if (l.listPrice > l.unitPrice) { %><s><%= baht(l.listPrice) %></s> <span style="color:var(--bad)"><%= baht(l.unitPrice) %></span><% } else { %><%= baht(l.unitPrice) %><% } %> × <%= l.qty %></div>
               </div>
               <div style="font-weight:600"><%= baht(l.lineTotal) %></div>
             </div>

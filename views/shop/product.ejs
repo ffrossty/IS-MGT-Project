@@ -15,7 +15,11 @@
     <div class="pdp-info">
       <div class="eyebrow"><%= p.category_name || 'Collection' %></div>
       <h1><%= p.name %></h1>
-      <div class="pdp-price"><span data-price><%= baht(p.base_price) %></span> <small data-price-note>/ <%= p.base_days %> วัน<% if (p.extra_day_price) { %> · วันถัดไป +<%= baht(p.extra_day_price) %>/วัน<% } %></small></div>
+      <div class="pdp-price"><span data-price class="<%= firstPrice.promo ? 'sale' : '' %>"><%= baht(firstPrice.price) %></span> <s class="was" data-was <%= firstPrice.promo ? '' : 'hidden' %>><%= baht(firstPrice.original) %></s></div>
+      <% if (firstPrice.promo) { %><div class="promo-banner">🏷️ <%= firstPrice.promo.label || 'โปรโมชั่น' %> — ลด <%= firstPrice.promo.type === 'percent' ? firstPrice.promo.value + '%' : baht(firstPrice.promo.value) + ' ต่อชุด' %><%= firstPrice.promo.end ? ' · ถึง ' + T.dt(firstPrice.promo.end) : '' %></div><% } %>
+      <div class="price-table">
+        <% priceRows.forEach(r => { %><div class="pt"><span><%= r.days %> วัน</span><strong><%= baht(r.price) %></strong><% if (r.promo) { %><s><%= baht(r.original) %></s><% } %></div><% }) %>
+      </div>
 
       <form method="post" action="/cart/add" id="book" data-product="<%= p.id %>" style="margin-top:22px">
         <input type="hidden" name="_csrf" value="<%= csrf %>">

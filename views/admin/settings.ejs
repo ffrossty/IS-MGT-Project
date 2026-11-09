@@ -16,6 +16,19 @@
       <div class="field"><label>ที่อยู่</label><textarea name="return_address" rows="3" placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"><%= s.return_address %></textarea><div class="hint">แสดงในหน้า “ส่งคืนชุด” ของลูกค้า · ลูกค้าในกรุงเทพมหานครต้องส่งคืนแบบส่งด่วนเท่านั้น</div></div>
       <label class="checkbox"><input type="checkbox" name="notify_admin_return" value="1" <%= s.notify_admin_return === '1' ? 'checked' : '' %>> แจ้งเตือนแอดมินทาง LINE เมื่อลูกค้าแจ้งส่งคืนชุด</label>
     </div>
+    <div class="card"><h3>โปรโมชั่นทั้งร้าน</h3>
+      <div class="form-grid">
+        <div class="field"><label>ส่วนลด</label><select name="shop_promo_type">
+          <option value="">ไม่มีโปรโมชั่น</option>
+          <option value="percent" <%= s.shop_promo_type === 'percent' ? 'selected' : '' %>>ลดเป็น %</option>
+          <option value="amount" <%= s.shop_promo_type === 'amount' ? 'selected' : '' %>>ลดเป็นบาท (ต่อชุด)</option></select></div>
+        <div class="field"><label>มูลค่าส่วนลด</label><input type="number" name="shop_promo_value" min="0" value="<%= s.shop_promo_value %>" placeholder="เช่น 15"></div>
+        <div class="field"><label>เริ่ม (ไม่บังคับ)</label><input type="datetime-local" name="shop_promo_start" value="<%= s.shop_promo_start ? T.toInputDateTime(Number(s.shop_promo_start)) : '' %>"></div>
+        <div class="field"><label>สิ้นสุด (ไม่บังคับ)</label><input type="datetime-local" name="shop_promo_end" value="<%= s.shop_promo_end ? T.toInputDateTime(Number(s.shop_promo_end)) : '' %>"></div>
+        <div class="field full"><label>ชื่อโปรโมชั่น</label><input type="text" name="shop_promo_label" maxlength="60" value="<%= s.shop_promo_label %>" placeholder="เช่น Flash Sale 11.11"></div>
+      </div>
+      <p class="hint small muted">ใช้กับทุกชุดในร้าน · ถ้าชุดไหนมีโปรของตัวเองด้วย ลูกค้าได้ส่วนลดที่มากกว่า · คำสั่งจองที่สร้างไปแล้วใช้ราคาเดิม</p>
+    </div>
     <div class="card"><h3>การชำระเงิน</h3>
       <div class="form-grid"><%- inp('promptpay_id', 'PromptPay ID', 'เบอร์มือถือ 10 หลัก หรือเลขประจำตัว 13 หลัก — ระบบสร้าง QR พร้อมยอดเงินอัตโนมัติ') %><%- inp('promptpay_name', 'ชื่อบัญชี (แสดงให้ลูกค้า)') %></div>
       <div class="field"><label>หรือ อัปโหลดรูป QR Code ของร้าน</label>
