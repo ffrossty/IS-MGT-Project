@@ -52,7 +52,7 @@ router.get('/', (req, res) => {
   const inRange = 'created_at >= ? AND created_at < ?';
   const paid = "status IN ('confirmed','returned','completed') AND payment_status = 'approved'";
   const stats = {
-    total: c(`SELECT COUNT(*) n FROM orders WHERE ${inRange} AND status NOT IN ('expired')`, r.from, r.to),
+    total: c(`SELECT COUNT(*) n FROM orders WHERE ${inRange} AND slip_filename IS NOT NULL`, r.from, r.to),
     awaitingPayment: c("SELECT COUNT(*) n FROM orders WHERE status = 'awaiting_payment' AND hold_expires_at > ?", now),
     pendingApproval: c("SELECT COUNT(*) n FROM orders WHERE status = 'pending_approval'"),
     slipToCheck: c("SELECT COUNT(*) n FROM orders WHERE status = 'pending_approval' AND payment_status = 'submitted'"),
@@ -364,6 +364,11 @@ router.get('/orders', (req, res) => {
   if (q.to) { where.push('o.created_at < @to'); p.to = T.parseLocal(q.to) + T.DAY; }
   if (q.rent_from) { where.push('EXISTS (SELECT 1 FROM order_items x WHERE x.order_id = o.id AND x.due_at >= @rf)'); p.rf = T.parseLocal(q.rent_from); }
   if (q.rent_to) { where.push('EXISTS (SELECT 1 FROM order_items x WHERE x.order_id = o.id AND x.start_at < @rt)'); p.rt = T.parseLocal(q.rent_to) + T.DAY; }
+  // By default list only orders where the customer has attached a slip (orders abandoned at the
+  // payment step would clutter the list). Searching, picking a status, or "show all" lists everything.
+  const showAll = q.all === '1' || !!q.q || !!q.status;
+  const hiddenCount = showAll ? 0 : db.prepare(`SELECT COUNT(*) n FROM orders o WHERE ${where.join(' AND ')} AND o.slip_filename IS NULL`).get(p).n;
+  if (!showAll) where.push('o.slip_filename IS NOT NULL');
   const page = Math.max(1, int(q.page, 1)); const per = 30;
   const total = db.prepare(`SELECT COUNT(*) n FROM orders o WHERE ${where.join(' AND ')}`).get(p).n;
   const orders = db.prepare(`SELECT o.*, u.display_name,
@@ -371,7 +376,7 @@ router.get('/orders', (req, res) => {
       (SELECT MIN(start_at) FROM order_items WHERE order_id = o.id) AS first_start,
       (SELECT MAX(due_at) FROM order_items WHERE order_id = o.id) AS last_due
     FROM orders o JOIN users u ON u.id = o.user_id WHERE ${where.join(' AND ')} ORDER BY o.id DESC LIMIT ${per} OFFSET ${(page - 1) * per}`).all(p);
-  res.render('admin/orders', { title: 'คำสั่งซื้อ', orders, total, page, pages: Math.ceil(total / per) });
+  res.render('admin/orders', { title: 'คำสั่งซื้อ', orders, total, page, pages: Math.ceil(total / per), showAll, hiddenCount });
 });
 
 function loadOrder(req, res, next) {

@@ -7,9 +7,14 @@
   <div class="field"><label>ถึง</label><input type="date" name="to" value="<%= query.to || '' %>"></div>
   <div class="field"><label>ช่วงเช่าตั้งแต่</label><input type="date" name="rent_from" value="<%= query.rent_from || '' %>"></div>
   <div class="field"><label>ถึง</label><input type="date" name="rent_to" value="<%= query.rent_to || '' %>"></div>
+  <label class="checkbox" style="align-self:center"><input type="checkbox" name="all" value="1" <%= query.all === '1' ? 'checked' : '' %>> รวมออเดอร์ที่ยังไม่แนบสลิป</label>
   <button class="btn sm">กรอง</button><a class="btn sm ghost" href="/admin/orders">ล้าง</a>
 </form>
-<div class="small muted" style="margin-bottom:8px">พบ <%= total %> รายการ</div>
+<div class="small muted row" style="margin-bottom:8px;gap:8px">
+  <span>พบ <%= total %> รายการ<%= showAll ? '' : ' (เฉพาะออเดอร์ที่ลูกค้าแนบสลิปแล้ว)' %></span>
+  <% if (!showAll && hiddenCount) { %>· <span>ซ่อน <%= hiddenCount %> ออเดอร์ที่ยังไม่แนบสลิป</span> <a class="link" href="<%= h.qs(query, { all: '1', page: '' }) %>">แสดงทั้งหมด</a>
+  <% } else if (query.all === '1') { %>· <a class="link" href="<%= h.qs(query, { all: '', page: '' }) %>">ซ่อนออเดอร์ที่ยังไม่แนบสลิป</a><% } %>
+</div>
 <div class="card" style="padding:0"><div class="table-wrap"><table class="table">
   <thead><tr><th>Order ID</th><th>สั่งจองเมื่อ</th><th>ลูกค้า</th><th>สินค้า</th><th>ช่วงเช่า</th><th class="right">ยอดรวม</th><th>สถานะ</th><th>ชำระเงิน</th><th>จัดส่ง</th><th>ส่งคืน</th></tr></thead>
   <tbody>

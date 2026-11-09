@@ -15,7 +15,7 @@
 
 <div class="stats five">
   <div class="stat hl"><div class="k">รายได้รวม (ชำระแล้ว)</div><div class="v"><%= baht(stats.revenue) %></div><div class="s"><%= r.label %></div></div>
-  <a class="stat" href="/admin/orders"><div class="k">คำสั่งซื้อทั้งหมด</div><div class="v"><%= stats.total %></div><div class="s">ในช่วงที่เลือก</div></a>
+  <a class="stat" href="/admin/orders"><div class="k">คำสั่งซื้อทั้งหมด</div><div class="v"><%= stats.total %></div><div class="s">ที่แนบสลิปแล้ว ในช่วงที่เลือก</div></a>
   <a class="stat <%= stats.pendingApproval ? 'alert' : '' %>" href="/admin/orders?status=pending_approval"><div class="k">รอการยืนยัน</div><div class="v"><%= stats.pendingApproval %></div><div class="s"><%= stats.overdueReview ? `เกินเวลาตรวจ ${stats.overdueReview} รายการ` : 'สต็อกถูกล็อกไว้' %></div></a>
   <a class="stat" href="/admin/orders?status=pending_approval&payment=submitted"><div class="k">รอตรวจสอบสลิป</div><div class="v"><%= stats.slipToCheck %></div><div class="s">ลูกค้าส่งสลิปแล้ว</div></a>
   <a class="stat" href="/admin/orders?status=awaiting_payment"><div class="k">รอลูกค้าชำระเงิน</div><div class="v"><%= stats.awaitingPayment %></div><div class="s">ล็อกสต็อกชั่วคราว</div></a>
