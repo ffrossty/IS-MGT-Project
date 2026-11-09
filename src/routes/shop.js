@@ -122,7 +122,8 @@ router.get('/products/:id', (req, res, next) => {
   const sizeChart = parseSizeChart(p.size_chart);
   const buffers = A.productBuffers(p);
   const defaultTime = rental.time || `${T.pad(Number(getSettings().pickup_start_hour))}:00`;
-  const priceRows = A.durationOptions().map((d) => ({ days: d, ...priceDetail(p, d) }));
+  // แสดงเฉพาะแพ็กเกจราคาที่แอดมินตั้งไว้ (เช่น 1 / 3 / 5 วัน) ไม่แสดงวันที่คำนวณต่อเอง
+  const priceRows = tiers(p).map((t) => ({ days: t.days, ...priceDetail(p, t.days) }));
   res.render('shop/product', {
     title: p.name, p, images, skus, sizeChart, buffers, rental, defaultTime, priceRows, firstPrice: priceDetail(p, (rental.days || tiers(p)[0].days)), timeOptions: timeOptions(), durations: A.durationOptions(),
     minDate: T.toInputDate(Date.now() + settingNum('min_advance_hours', 0) * T.HOUR),
