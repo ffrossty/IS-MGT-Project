@@ -92,9 +92,10 @@ test('re-upload deadline is slip_reupload_minutes (default 60) from now', async 
   assert.ok(hold >= before + 60 * 60000 && hold <= Date.now() + 60 * 60000, 'deadline = now + 60 min');
 });
 
-test('admins get LINE alerts for new order and uploaded slip (and can switch them off)', async () => {
+test('admins get a LINE alert only after the customer uploads a slip', async () => {
   const { setSettings } = require('../src/db');
   const line = require('../src/lib/line');
+  assert.equal(line.adminNewOrder, undefined, 'no alert on order placement');
   const now = Date.now();
   const adminLine = `Uadmin${Math.random().toString(16).slice(2)}`;
   db.prepare("INSERT INTO users(line_user_id, display_name, role, created_at) VALUES (?, 'แอดมิน', 'admin', ?)").run(adminLine, now);
@@ -102,20 +103,18 @@ test('admins get LINE alerts for new order and uploaded slip (and can switch the
 
   sent.length = 0;
   const { order } = makeOrder('awaiting_payment');
-  await line.adminNewOrder(order);
-  const toAdmin = sent.filter((m) => m.to === adminLine);
-  assert.equal(toAdmin.length, 1, 'real admin notified once');
-  assert.ok(!sent.some((m) => m.to === 'dev-admin-x'), 'dev accounts are not messaged');
-  assert.match(toAdmin[0].messages[0].text, /ออเดอร์ใหม่[\s\S]*Rosé Dress[\s\S]*฿1,080[\s\S]*\/admin\/orders\//);
-
-  sent.length = 0;
   O.uploadSlip(order, { id: order.user_id, role: 'customer' }, 'slip2.png');
   await new Promise((r) => setTimeout(r, 50));
-  assert.ok(sent.some((m) => m.to === adminLine && /มีสลิปรอตรวจสอบ/.test(m.messages[0].text)));
+  const toAdmin = sent.filter((m) => m.to === adminLine);
+  assert.equal(toAdmin.length, 1);
+  assert.match(toAdmin[0].messages[0].text, /มีสลิปรอตรวจสอบ[\s\S]*Rosé Dress \(ไซส์ M\) x1[\s\S]*คืนภายใน[\s\S]*฿1,080[\s\S]*\/admin\/orders\//);
+  assert.ok(!sent.some((m) => m.to === 'dev-admin-x'), 'dev accounts are not messaged');
 
   sent.length = 0;
-  setSettings({ notify_admin_new_order: '0' });
-  assert.equal(line.adminNewOrder(order), null);
-  assert.equal(sent.length, 0);
-  setSettings({ notify_admin_new_order: '1' });
+  setSettings({ notify_admin_slip: '0' });
+  const b = makeOrder('awaiting_payment');
+  O.uploadSlip(b.order, { id: b.order.user_id, role: 'customer' }, 'slip3.png');
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(sent.filter((m) => m.to === adminLine).length, 0, 'switch off works');
+  setSettings({ notify_admin_slip: '1' });
 });

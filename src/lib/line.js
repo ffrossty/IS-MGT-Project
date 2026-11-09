@@ -144,21 +144,12 @@ async function notifyAdmins(order, type, text) {
   return Promise.all(admins.map((a) => notify(order, type, text, a.id)));
 }
 
-function adminNewOrder(order) {
-  if (getSettings().notify_admin_new_order !== '1') return null;
-  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(order.id);
-  const ship = order.shipping_method === 'ems' ? 'EMS' : 'Express (Grab/Lalamove)';
-  const text = `🛍️ ออเดอร์ใหม่ ${order.code}\nลูกค้า: ${order.recipient_name} · ${order.phone}\n\n${itemLines(items)}\n\n`
-    + `ยอดรวม: ฿${order.total.toLocaleString('th-TH')} · จัดส่ง ${ship}\nสถานะ: รอลูกค้าชำระเงิน (ล็อกสต็อกถึง ${T.dt(order.hold_expires_at)})\n\n`
-    + `ดูออเดอร์: ${config.baseUrl}/admin/orders/${order.code}`;
-  return notifyAdmins(order, 'admin_new_order', text);
-}
-
 function adminSlipUploaded(order) {
   if (getSettings().notify_admin_slip !== '1') return null;
-  const text = `💳 มีสลิปรอตรวจสอบ ${order.code}\nลูกค้า: ${order.recipient_name}\nยอดที่ต้องได้รับ: ฿${order.total.toLocaleString('th-TH')}\n`
+  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(order.id);
+  const text = `💳 มีสลิปรอตรวจสอบ ${order.code}\nลูกค้า: ${order.recipient_name} · ${order.phone}\n\n${itemLines(items)}\n\nยอดที่ต้องได้รับ: ฿${order.total.toLocaleString('th-TH')}\n`
     + `ควรตรวจสอบภายใน ${T.dt(order.review_due_at)}\n\nตรวจสลิป: ${config.baseUrl}/admin/orders/${order.code}`;
   return notifyAdmins(order, 'admin_slip_uploaded', text);
 }
 
-module.exports = { adminNewOrder, adminSlipUploaded, buildAuthorizeUrl, handleCallback, callbackUrl, bookingConfirmed, shipped, slipRejected, orderRejected, orderCancelled, push };
+module.exports = { adminSlipUploaded, buildAuthorizeUrl, handleCallback, callbackUrl, bookingConfirmed, shipped, slipRejected, orderRejected, orderCancelled, push };
