@@ -1,6 +1,6 @@
 <%- include('../partials/header') %>
 <div class="container">
-  <div class="small muted" style="margin-top:20px"><a href="/" class="link">คอลเลกชัน</a> / <%= p.category_name || 'สินค้า' %></div>
+  <div class="small muted" style="margin-top:20px"><a href="/" class="link">คอลเลกชัน</a> / <%= p.name %></div>
   <% if (!p.is_active) { %><div class="flash warn">สินค้านี้ถูกซ่อนจากหน้าร้าน (คุณเห็นเพราะเป็น Admin)</div><% } %>
   <div class="pdp">
     <div class="gallery" data-gallery>
@@ -24,7 +24,7 @@
     </div>
 
     <div class="pdp-info">
-      <div class="eyebrow"><%= p.category_name || 'Collection' %></div>
+      <div class="eyebrow">Collection</div>
       <h1><%= p.name %></h1>
       <div class="pdp-price"><span data-price class="<%= firstPrice.promo ? 'sale' : '' %>"><%= baht(firstPrice.price) %></span> <s class="was" data-was <%= firstPrice.promo ? '' : 'hidden' %>><%= baht(firstPrice.original) %></s></div>
       <% if (firstPrice.promo) { %><div class="promo-banner">🏷️ <%= firstPrice.promo.label || 'โปรโมชั่น' %> — ลด <%= firstPrice.promo.type === 'percent' ? firstPrice.promo.value + '%' : baht(firstPrice.promo.value) + ' ต่อชุด' %><%= firstPrice.promo.end ? ' · ถึง ' + T.dt(firstPrice.promo.end) : '' %></div><% } %>
@@ -32,20 +32,39 @@
         <% priceRows.forEach(r => { %><div class="pt"><span><%= r.days %> วัน</span><strong><%= baht(r.price) %></strong><% if (r.promo) { %><s><%= baht(r.original) %></s><% } %></div><% }) %>
       </div>
 
+      <% const MS = L.MEASURES.map(m => [m.ab, m.label + ' · ' + m.th, h.measureValue(p, m.col)]); const hasMS = MS.some(m => m[2] != null); %>
+      <% if (p.size || hasMS) { %>
+        <div class="pdp-fit">
+          <% if (p.size) { %><div class="pdp-size"><span>ไซส์</span><strong><%= p.size %></strong></div><% } %>
+          <% if (hasMS) { %>
+            <div class="pdp-measures" aria-label="สัดส่วนชุด (นิ้ว)">
+              <% MS.forEach(([ab, lab, v]) => { %><div class="m <%= v === 'Freesize' ? 'free' : '' %>"><span class="ab"><%= ab %></span><strong><%= v == null ? '–' : v %></strong><span class="lab"><%= lab %></span></div><% }) %>
+            </div>
+            <div class="small muted" style="margin-top:6px">ตัวเลขเป็นหน่วยนิ้ว</div>
+          <% } %>
+        </div>
+      <% } %>
+
       <form method="post" action="/cart/add" id="book" data-product="<%= p.id %>" style="margin-top:22px">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <input type="hidden" name="product_id" value="<%= p.id %>">
 
-        <div class="field">
-          <label>เลือกไซส์ <a href="#sizechart" class="link small" style="font-weight:400;margin-left:6px">ตารางขนาด</a></label>
-          <div class="size-select">
-            <% skus.forEach((s, i) => { %>
-              <input type="radio" name="sku_id" id="sku<%= s.id %>" value="<%= s.id %>" <%= s.stock_qty === 0 ? 'disabled' : '' %> <%= i === skus.findIndex(x => x.stock_qty > 0) ? 'checked' : '' %>>
-              <label for="sku<%= s.id %>"><%= s.size_label %><small>มี <%= s.stock_qty %> ตัว</small></label>
-            <% }) %>
-            <% if (!skus.length) { %><span class="muted small">ยังไม่มีไซส์สำหรับสินค้านี้</span><% } %>
+        <% const legacy = skus.length > 1; const mainSku = skus.find(x => x.stock_qty > 0) || skus[0]; %>
+        <% if (legacy) { %>
+          <div class="field">
+            <label>เลือกไซส์</label>
+            <div class="size-select">
+              <% skus.forEach((s, i) => { %>
+                <input type="radio" name="sku_id" id="sku<%= s.id %>" value="<%= s.id %>" <%= s.stock_qty === 0 ? 'disabled' : '' %> <%= s === mainSku ? 'checked' : '' %>>
+                <label for="sku<%= s.id %>"><%= s.size_label %><small>มี <%= s.stock_qty %> ตัว</small></label>
+              <% }) %>
+            </div>
           </div>
-        </div>
+        <% } else if (mainSku) { %>
+          <input type="hidden" name="sku_id" value="<%= mainSku.id %>" data-sku>
+        <% } else { %>
+          <p class="muted small">ชุดนี้ยังไม่เปิดให้จอง</p>
+        <% } %>
 
         <div class="form-grid">
           <div class="field">
@@ -74,7 +93,7 @@
           </div>
         </div>
 
-        <div class="avail-box" data-avail>เลือกไซส์ วัน และเวลา เพื่อตรวจสอบสต็อกที่ว่าง</div>
+        <div class="avail-box" data-avail>เลือกวันและเวลา เพื่อตรวจสอบว่าชุดว่างหรือไม่</div>
 
         <div class="row" style="gap:10px">
           <% if (user) { %>
@@ -95,12 +114,6 @@
 
       <div style="margin-top:22px">
         <details class="acc" open><summary>รายละเอียดสินค้า</summary><div><%= p.description || '-' %></div></details>
-        <details class="acc" id="sizechart" <%= sizeChart ? 'open' : '' %>><summary>ตารางขนาด (Size Chart)</summary><div style="white-space:normal">
-          <% if (sizeChart) { %>
-            <div class="table-wrap"><table class="size-chart"><thead><tr><% sizeChart.head.forEach(c => { %><th><%= c %></th><% }) %></tr></thead>
-            <tbody><% sizeChart.rows.forEach(r => { %><tr><% r.forEach(c => { %><td><%= c %></td><% }) %></tr><% }) %></tbody></table></div>
-          <% } else { %>ยังไม่มีตารางขนาด<% } %>
-        </div></details>
         <details class="acc"><summary>เงื่อนไขการเช่า</summary><div><%= p.conditions ? p.conditions + '\n\n' : '' %><%= settings.rental_terms %>
 
 เวลารับ/เริ่มเช่าและคืนชุด: <%= String(settings.pickup_start_hour).padStart(2,'0') %>:00 – <%= String(settings.pickup_end_hour).padStart(2,'0') %>:00 น.

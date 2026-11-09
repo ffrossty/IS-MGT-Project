@@ -6,18 +6,18 @@
     </div>
     <p class="small muted">ตัวเลข = จำนวนชุดที่ว่างตลอดทั้งวันนั้น (หักการจอง ช่วงเตรียม/ทำความสะอาด และการปิดชั่วคราวแล้ว)</p>
     <div class="table-wrap"><table class="heat">
-      <thead><tr><th class="label">ไซส์ (สต็อก)</th><% grid[0] && grid[0].days.forEach(d => { %><th><%= d.d %></th><% }) %></tr></thead>
+      <thead><tr><th class="label">ชุด (สต็อก)</th><% grid[0] && grid[0].days.forEach(d => { %><th><%= d.d %></th><% }) %></tr></thead>
       <tbody>
-        <% grid.forEach(g => { %><tr><th class="label"><%= g.sku.size_label %> (<%= g.sku.stock_qty %>)</th>
+        <% grid.forEach(g => { %><tr><th class="label"><%= g.sku.size_label || p.name %> (<%= g.sku.stock_qty %>)</th>
           <% g.days.forEach(d => { %><td class="<%= d.free === 0 ? 'f0' : d.free < g.sku.stock_qty ? 'f1' : 'f2' %> <%= d.dow === 0 || d.dow === 6 ? 'we' : '' %>"><%= d.free %></td><% }) %></tr>
         <% }) %>
       </tbody>
     </table></div>
-    <% if (!grid.length) { %><p class="muted">ยังไม่มีไซส์ — เพิ่มไซส์ในหน้าแก้ไขสินค้า</p><% } %>
+    <% if (!grid.length) { %><p class="muted">ยังไม่มีสต็อก — ใส่จำนวนชุดในหน้าแก้ไขสินค้า</p><% } %>
 
     <h3 style="margin-top:24px">การจองที่ยังไม่เสร็จสิ้น</h3>
-    <table class="table"><thead><tr><th>Order</th><th>ไซส์</th><th>เริ่ม → คืน</th><th>ล็อกสต็อก (รวมเตรียม/ทำความสะอาด)</th><th>สถานะ</th></tr></thead><tbody>
-      <% bookings.forEach(b => { %><tr class="clickable" data-href="/admin/orders/<%= b.code %>"><td class="mono"><%= b.code %></td><td><%= b.size_label %> ×<%= b.qty %></td><td class="small nowrap"><%= T.dt(b.start_at) %><br><%= T.dt(b.due_at) %></td><td class="small nowrap muted"><%= T.dt(b.block_start) %><br><%= T.dt(b.block_end) %></td><td><%- h.orderBadge(b.status) %></td></tr><% }) %>
+    <table class="table"><thead><tr><th>Order</th><th>จำนวน</th><th>เริ่ม → คืน</th><th>ล็อกสต็อก (รวมเตรียม/ทำความสะอาด)</th><th>สถานะ</th></tr></thead><tbody>
+      <% bookings.forEach(b => { %><tr class="clickable" data-href="/admin/orders/<%= b.code %>"><td class="mono"><%= b.code %></td><td><%= b.size_label ? b.size_label + ' ' : '' %>×<%= b.qty %></td><td class="small nowrap"><%= T.dt(b.start_at) %><br><%= T.dt(b.due_at) %></td><td class="small nowrap muted"><%= T.dt(b.block_start) %><br><%= T.dt(b.block_end) %></td><td><%- h.orderBadge(b.status) %></td></tr><% }) %>
       <% if (!bookings.length) { %><tr><td colspan="5" class="muted small">ไม่มี</td></tr><% } %>
     </tbody></table>
   </div>
@@ -29,7 +29,7 @@
       <form method="post" action="/admin/products/<%= p.id %>/blocks">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <div class="form-grid">
-          <div class="field"><label class="req">ไซส์</label><select name="sku_id" required><% grid.forEach(g => { %><option value="<%= g.sku.id %>"><%= g.sku.size_label %> (สต็อก <%= g.sku.stock_qty %>)</option><% }) %></select></div>
+          <div class="field"><label class="req">ชุด</label><select name="sku_id" required><% grid.forEach(g => { %><option value="<%= g.sku.id %>"><%= g.sku.size_label || p.name %> (สต็อก <%= g.sku.stock_qty %>)</option><% }) %></select></div>
           <div class="field"><label class="req">จำนวน</label><input type="number" name="qty" value="1" min="1"></div>
           <div class="field"><label class="req">ตั้งแต่</label><input type="datetime-local" name="start" required></div>
           <div class="field"><label class="req">ถึง</label><input type="datetime-local" name="end" required></div>
@@ -43,7 +43,7 @@
       <h3>ช่วงที่ปิดไว้</h3>
       <% if (!blocks.length) { %><p class="muted small">ไม่มี</p><% } %>
       <ul class="event-list">
-        <% blocks.forEach(b => { %><li class="row between"><div><strong><%= L.BLOCK_REASON[b.reason] %></strong> · ไซส์ <%= b.size_label %> ×<%= b.qty %><div class="small muted"><%= T.dt(b.start_at) %> → <%= T.dt(b.end_at) %><%= b.note ? ' · ' + b.note : '' %></div></div>
+        <% blocks.forEach(b => { %><li class="row between"><div><strong><%= L.BLOCK_REASON[b.reason] %></strong> <%= b.size_label ? ' · ไซส์ ' + b.size_label : '' %> ×<%= b.qty %><div class="small muted"><%= T.dt(b.start_at) %> → <%= T.dt(b.end_at) %><%= b.note ? ' · ' + b.note : '' %></div></div>
           <form method="post" action="/admin/blocks/<%= b.id %>/delete" data-confirm="ยกเลิกการปิดช่วงนี้?"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm danger">ลบ</button></form></li><% }) %>
       </ul>
     </div>

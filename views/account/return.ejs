@@ -7,7 +7,7 @@
     <h3>ชุดที่ต้องส่งคืน</h3>
     <% items.forEach(i => { %>
       <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line-2)">
-        <span><strong><%= i.product_name %></strong> (ไซส์ <%= i.size_label %>) ×<%= i.qty %></span>
+        <span><strong><%= i.product_name %></strong> <%= h.sz(i.size_label, true) %> ×<%= i.qty %></span>
         <span class="small">คืนภายใน <strong><%= T.dt(i.due_at) %></strong><% if (i.due_at < Date.now()) { %> <span class="badge bad">เลยกำหนด</span><% } %></span>
       </div>
     <% }) %>

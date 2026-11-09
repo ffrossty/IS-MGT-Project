@@ -226,7 +226,17 @@ addColumn('products', 'promo_value', 'INTEGER');
 addColumn('products', 'promo_start', 'INTEGER');
 addColumn('products', 'promo_end', 'INTEGER');
 addColumn('products', 'promo_label', 'TEXT');
-addColumn('order_items', 'list_price', 'INTEGER');     // price before promotion (for records)
+addColumn('order_items', 'list_price', 'INTEGER');
+// สัดส่วนชุด (นิ้ว) — ใช้แทนระบบไซส์ และใช้กรองในหน้าคอลเลกชัน
+addColumn('products', 'bust', 'REAL');
+addColumn('products', 'waist', 'REAL');
+addColumn('products', 'hip', 'REAL');
+addColumn('products', 'length', 'REAL');
+addColumn('products', 'bust_free', 'INTEGER NOT NULL DEFAULT 0');    // 1 = Freesize สำหรับสัดส่วนนั้น
+addColumn('products', 'waist_free', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('products', 'hip_free', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('products', 'length_free', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('products', 'size', 'TEXT');                             // Freesize | XS | S | M | L | XL | NULL (ไม่ระบุ)     // price before promotion (for records)
 db.prepare("UPDATE orders SET return_method = 'parcel', return_carrier = COALESCE(return_carrier, 'ไปรษณีย์ไทย EMS') WHERE return_method = 'ems'").run();
 
 const DEFAULT_SETTINGS = {
@@ -292,6 +302,21 @@ if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migr_prep_0'").get()) {
 }
 
 // one-time: move the old 48h advance-booking default to 3h (an admin-chosen value other than 48 is kept)
+// ระบบไซส์ใหม่: 1 ชุด = 1 สต็อก มีไซส์ (ไม่บังคับ) จาก Freesize, XS, S, M, L, XL
+// สินค้าเดิมที่มีสต็อกชุดเดียว: ย้ายชื่อไซส์ไปไว้ที่ products.size (ถ้าตรงกับรายการ) ไม่งั้นเว้นว่าง
+if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migr_size_v2'").get()) {
+  const norm = (v) => { const k = String(v || '').toLowerCase().replace(/[\s_-]+/g, ''); return { freesize: 'Freesize', fs: 'Freesize', f: 'Freesize', xs: 'XS', s: 'S', m: 'M', l: 'L', xl: 'XL' }[k] || null; };
+  const singles = db.prepare(`SELECT s.id, s.product_id, s.size_label FROM skus s WHERE s.deleted_at IS NULL AND s.product_id IN
+    (SELECT product_id FROM skus WHERE deleted_at IS NULL GROUP BY product_id HAVING COUNT(*) = 1)`).all();
+  db.transaction(() => {
+    for (const s of singles) {
+      const size = norm(s.size_label);
+      db.prepare('UPDATE products SET size = COALESCE(size, ?) WHERE id = ?').run(size, s.product_id);
+      db.prepare('UPDATE skus SET size_label = ? WHERE id = ?').run(size || '', s.id);
+    }
+    db.prepare("INSERT INTO settings(key, value) VALUES ('migr_size_v2', '1')").run();
+  })();
+}
 if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migr_min_adv_3'").get()) {
   db.prepare("UPDATE settings SET value = '3' WHERE key = 'min_advance_hours' AND value = '48'").run();
   db.prepare("INSERT INTO settings(key, value) VALUES ('migr_min_adv_3', '1')").run();

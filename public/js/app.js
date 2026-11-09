@@ -22,6 +22,16 @@
       const tr = b.closest('tr'); const tb = tr.parentElement;
       if (tb.children.length > 1) tr.remove(); else $$('input', tr).forEach((i) => { i.value = ''; });
     });
+    // "Freesize" toggles next to measurement inputs (admin form + catalog filter): checked → number inputs off
+    $$('[data-fs]').forEach((cb) => {
+      const wrap = cb.closest('[data-fs-wrap]');
+      const inputs = wrap ? $$('input[type=number]', wrap) : [];
+      const sync = () => inputs.forEach((i) => {
+        i.disabled = cb.checked;
+        if (cb.checked) { i.dataset.ph = i.dataset.ph || i.placeholder; i.placeholder = 'Freesize'; i.value = ''; } else if (i.dataset.ph) i.placeholder = i.dataset.ph;
+      });
+      cb.addEventListener('change', sync); sync();
+    });
     $$('[data-close-dialog]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
 
     // product page gallery: arrows, thumbnails, keyboard ← →, swipe
@@ -263,7 +273,7 @@
     const box = $('[data-avail]');
     const cal = $('[data-calendar]');
     const submits = $$('[data-submit]', form);
-    const sku = () => { const r = $('input[name=sku_id]:checked', form); return r ? r.value : null; };
+    const sku = () => { const r = $('input[name=sku_id]:checked', form) || $('input[data-sku]', form); return r ? r.value : null; };
     const date = $('input[name=start_date]', form);
     const time = $('select[name=start_time]', form);
     const days = $('select[name=days]', form);
@@ -275,7 +285,7 @@
 
     async function check() {
       const s = sku();
-      if (!s || !date.value) { box.className = 'avail-box'; box.textContent = 'เลือกไซส์และวันเริ่มเช่า เพื่อตรวจสอบสต็อกที่ว่าง'; setSubmit(!!s && !!date.value); return; }
+      if (!s || !date.value) { box.className = 'avail-box'; box.textContent = s ? 'เลือกวันเริ่มเช่า เพื่อตรวจสอบว่าชุดว่างหรือไม่' : 'ชุดนี้ยังไม่เปิดให้จอง'; setSubmit(!!s && !!date.value); return; }
       const my = ++seq;
       box.className = 'avail-box'; box.textContent = 'กำลังตรวจสอบ…';
       try {
@@ -297,7 +307,7 @@
     async function renderCal() {
       const s = sku();
       if (!cal) return;
-      if (!s) { cal.innerHTML = '<p class="muted small">เลือกไซส์เพื่อดูปฏิทิน</p>'; return; }
+      if (!s) { cal.innerHTML = '<p class="muted small">ชุดนี้ยังไม่เปิดให้จอง</p>'; return; }
       const r = await fetch(`/api/calendar?sku=${s}&month=${calMonth}&days=${days.value}&time=${encodeURIComponent(time.value)}`).then((x) => x.json());
       const [y, m] = r.month.split('-').map(Number);
       const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();

@@ -39,7 +39,7 @@
         <tbody>
         <% items.forEach(i => { %>
           <tr>
-            <td><a class="link" href="/admin/products/<%= i.product_id %>/calendar"><%= i.product_name %></a><div class="small">ไซส์ <strong><%= i.size_label %></strong> × <%= i.qty %></div></td>
+            <td><a class="link" href="/admin/products/<%= i.product_id %>/calendar"><%= i.product_name %></a><div class="small"><% if (i.size_label) { %>ไซส์ <strong><%= i.size_label %></strong> · <% } %>จำนวน <%= i.qty %> ชุด</div></td>
             <td class="nowrap small"><%= T.dt(i.start_at) %></td>
             <td class="nowrap small"><strong><%= T.dt(i.due_at) %></strong><div class="muted"><%= i.days %> วัน (<%= i.days*24 %> ชม.)</div></td>
             <td class="nowrap small muted"><%= T.dt(i.block_start) %><br><%= T.dt(i.block_end) %></td>

@@ -65,7 +65,7 @@
     <table class="table"><tbody>
     <% returns.forEach(i => { %>
       <tr class="clickable" data-href="/admin/orders/<%= i.code %>">
-        <td><%= i.product_name %> (<%= i.size_label %>) ×<%= i.qty %><div class="small muted mono"><%= i.code %> · <%= i.recipient_name %></div></td>
+        <td><%= i.product_name %><%= h.sz(i.size_label) %> ×<%= i.qty %><div class="small muted mono"><%= i.code %> · <%= i.recipient_name %></div></td>
         <td class="nowrap small"><%= T.dt(i.due_at) %><% if (i.due_at < Date.now()) { %><div><span class="badge bad">เลยกำหนด</span></div><% } %></td>
       </tr>
     <% }) %>
@@ -75,7 +75,7 @@
     <table class="table"><tbody>
     <% upcoming.forEach(i => { %>
       <tr class="clickable" data-href="/admin/orders/<%= i.code %>">
-        <td><%= i.product_name %> (<%= i.size_label %>) ×<%= i.qty %><div class="small muted mono"><%= i.code %></div></td>
+        <td><%= i.product_name %><%= h.sz(i.size_label) %> ×<%= i.qty %><div class="small muted mono"><%= i.code %></div></td>
         <td class="nowrap small"><%= T.dt(i.start_at) %></td><td><%- h.shippingBadge(i.shipping_status) %></td>
       </tr>
     <% }) %>

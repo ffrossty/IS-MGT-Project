@@ -4,31 +4,37 @@
     <div class="card">
       <h3>ข้อมูลสินค้า</h3>
       <div class="field"><label class="req">ชื่อสินค้า</label><input type="text" name="name" value="<%= p.name || '' %>" required maxlength="150"></div>
-      <div class="form-grid">
-        <div class="field"><label>ประเภทสินค้า</label><select name="category_id"><option value="">- ไม่ระบุ -</option><% categories.forEach(c => { %><option value="<%= c.id %>" <%= p.category_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select><div class="hint"><a class="link" href="/admin/categories">จัดการประเภท</a></div></div>
-        <div class="field"><label class="checkbox" style="margin-top:28px"><input type="checkbox" name="is_active" value="1" <%= p.is_active ? 'checked' : '' %>> แสดงสินค้าบนหน้าร้าน</label></div>
-      </div>
+      <div class="field"><label class="checkbox"><input type="checkbox" name="is_active" value="1" <%= p.is_active ? 'checked' : '' %>> แสดงสินค้าบนหน้าร้าน</label></div>
       <div class="field"><label>รายละเอียดสินค้า</label><textarea name="description" rows="5"><%= p.description || '' %></textarea></div>
       <div class="field"><label>เงื่อนไขการเช่าเฉพาะสินค้านี้</label><textarea name="conditions" rows="3" placeholder="เช่น ห้ามใช้น้ำหอมฉีดโดยตรง, ค่ามัดจำ ฯลฯ"><%= p.conditions || '' %></textarea><div class="hint">แสดงร่วมกับเงื่อนไขทั่วไปของร้าน (ตั้งค่าร้าน)</div></div>
-      <div class="field"><label>ตารางขนาด (Size Chart)</label><textarea name="size_chart" rows="5" class="mono" placeholder="Size, อก, เอว, ความยาว&#10;S, 32, 26, 50&#10;M, 34, 28, 51"><%= p.size_chart || '' %></textarea><div class="hint">บรรทัดแรกเป็นหัวตาราง คั่นแต่ละคอลัมน์ด้วย , หรือ |</div></div>
     </div>
 
     <div class="card">
-      <div class="card-title"><h3>ไซส์และสต็อก (SKU)</h3><button type="button" class="btn sm secondary" data-add-row="#new-sizes">+ เพิ่มไซส์</button></div>
-      <table class="table">
-        <thead><tr><th>ไซส์</th><th>จำนวนสต็อก (ตัว)</th><th></th></tr></thead>
-        <tbody>
-          <% skus.forEach(s => { %>
-            <tr><td><input type="text" name="size_<%= s.id %>" value="<%= s.size_label %>" maxlength="30"></td>
-              <td><input type="number" name="qty_<%= s.id %>" value="<%= s.stock_qty %>" min="0"></td>
-              <td><button class="btn sm danger" form="del-sku-<%= s.id %>">ลบ</button></td></tr>
-          <% }) %>
-        </tbody>
-        <tbody id="new-sizes">
-          <tr><td><input type="text" name="new_size[]" placeholder="<%= skus.length ? 'ไซส์ใหม่ เช่น XL' : 'เช่น Free size / S / M' %>" maxlength="30"></td><td><input type="number" name="new_qty[]" value="1" min="0" data-default="1"></td><td></td></tr>
-        </tbody>
-      </table>
-      <p class="small muted">สต็อก = จำนวนชุดจริงที่ร้านมีในไซส์นั้น ระบบคำนวณจำนวนว่างตามช่วงเวลาจากการจองอัตโนมัติ · ปิดชุดชั่วคราว (ซ่อม/ซัก) ได้ที่หน้า <strong>ปฏิทิน</strong></p>
+      <h3>ไซส์ & สัดส่วนชุด</h3>
+      <div class="field" style="max-width:220px"><label for="p_size">ไซส์</label>
+        <select id="p_size" name="size">
+          <option value="">— ไม่ระบุไซส์ —</option>
+          <% L.SIZES.forEach(sz => { %><option value="<%= sz %>" <%= p.size === sz ? 'selected' : '' %>><%= sz %></option><% }) %>
+        </select>
+        <div class="hint">ไม่บังคับ — ชุดที่มีแค่สัดส่วน B W H L ให้เลือก “ไม่ระบุไซส์”</div></div>
+      <label style="margin-top:14px">สัดส่วน <span class="muted small" style="font-weight:400">(นิ้ว)</span></label>
+      <div class="measure-grid">
+        <% L.MEASURES.forEach(m => { const free = !!p[m.col + '_free']; %>
+          <div class="field mfield" data-fs-wrap>
+            <label for="m_<%= m.col %>" class="nowrap"><strong><%= m.ab %></strong> <span class="muted small"><%= m.th %></span></label>
+            <input type="number" id="m_<%= m.col %>" name="<%= m.col %>" value="<%= free ? '' : (p[m.col] ?? '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="เช่น <%= {bust:34,waist:28,hip:36,length:40}[m.col] %>">
+            <label class="fs-toggle"><input type="checkbox" name="<%= m.col %>_free" value="1" data-fs <%= free ? 'checked' : '' %>><span>Freesize</span></label>
+          </div>
+        <% }) %>
+      </div>
+      <p class="hint small muted">ใส่ตัวเลขเป็นนิ้ว หรือติ๊ก <strong>Freesize</strong> ถ้าสัดส่วนนั้นใส่ได้ทุกขนาด (เช่น สะโพกบาน) ไม่ต้องใส่ตัวเลข · ช่องที่เว้นว่าง ชุดนี้จะไม่ขึ้นเมื่อลูกค้ากรองด้วยสัดส่วนนั้น</p>
+      <% const extraSkus = skus.slice(1); %>
+      <div class="field" style="margin-top:14px;max-width:220px"><label class="req">จำนวนชุดที่มี (สต็อก)</label>
+        <input type="number" name="stock_qty" value="<%= skus.length ? skus[0].stock_qty : 1 %>" min="0" required></div>
+      <p class="small muted">ระบบคำนวณจำนวนว่างตามช่วงเวลาจากการจองอัตโนมัติ · ปิดชุดชั่วคราว (ซ่อม/ซัก) ได้ที่หน้า <strong>ปฏิทิน</strong></p>
+      <% if (extraSkus.length) { %>
+        <div class="flash warn small" style="margin-top:10px">สินค้านี้มีสต็อกแยกหลายไซส์จากระบบเดิม (<%= skus.map(s => s.size_label + ':' + s.stock_qty).join(', ') %>) — เมื่อกดบันทึก ระบบจะรวมเป็นชุดเดียวตามจำนวนสต็อกด้านบน (ไซส์ที่ยังมีการจองค้างอยู่จะคงไว้จนการจองเสร็จสิ้น)</div>
+      <% } %>
     </div>
 
     <div class="card" id="images">
@@ -92,7 +98,6 @@
   </div>
 </form>
 
-<% skus.forEach(s => { %><form id="del-sku-<%= s.id %>" method="post" action="/admin/skus/<%= s.id %>/delete" data-confirm="ลบไซส์ <%= s.size_label %>?"><input type="hidden" name="_csrf" value="<%= csrf %>"></form><% }) %>
 <% images.forEach(im => { %>
   <form id="del-img-<%= im.id %>" method="post" action="/admin/images/<%= im.id %>/delete" data-confirm="ลบรูปนี้?"><input type="hidden" name="_csrf" value="<%= csrf %>"></form>
   <form id="pri-img-<%= im.id %>" method="post" action="/admin/images/<%= im.id %>/primary"><input type="hidden" name="_csrf" value="<%= csrf %>"></form>

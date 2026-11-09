@@ -97,11 +97,11 @@ function createOrderFromCart(user, ship, now = Date.now()) {
       const sku = getSkuFull.get(c.sku_id);
       if (!sku || sku.deleted_at || sku.product_deleted || !sku.is_active) { problems.push(`${sku ? sku.product_name : 'สินค้า'}: ไม่เปิดให้เช่าแล้ว`); continue; }
       const err = A.validateRentalRequest(c.start_at, c.days, now);
-      if (err) { problems.push(`${sku.product_name} (${sku.size_label}): ${err}`); continue; }
+      if (err) { problems.push(`${sku.product_name}${sku.size_label ? ` (${sku.size_label})` : ''}: ${err}`); continue; }
       const w = A.windowFor(sku, c.start_at, c.days, ship.shipping_method);
       // items already inserted for this order are visible to this query → same-SKU lines are counted together
       const avail = A.availableQty(c.sku_id, w.blockStart, w.blockEnd, { sku, now });
-      if (avail < c.qty) { problems.push(`${sku.product_name} (${sku.size_label}): ${avail === 0 ? 'ไม่ว่างในช่วงเวลาที่เลือก' : `ว่างเพียง ${avail} ชิ้น`}`); continue; }
+      if (avail < c.qty) { problems.push(`${sku.product_name}${sku.size_label ? ` (${sku.size_label})` : ''}: ${avail === 0 ? 'ไม่ว่างในช่วงเวลาที่เลือก' : `ว่างเพียง ${avail} ชิ้น`}`); continue; }
       const price = unitPrice(sku, c.days);
       insItem.run(orderId, sku.id, sku.product_id, sku.product_name, sku.size_label, c.qty, w.startAt, c.days, w.dueAt, w.blockStart, w.blockEnd, price, price * c.qty, listPrice(sku, c.days));
       subtotal += price * c.qty;
@@ -319,7 +319,7 @@ function editItem(order, itemId, admin, { startAt, days, qty }) {
       .run(w.startAt, days, w.dueAt, w.blockStart, w.blockEnd, qty, price, price * qty, listPrice(sku, days), item.id);
     const subtotal = db.prepare('SELECT SUM(line_total) s FROM order_items WHERE order_id = ?').get(o.id).s;
     db.prepare('UPDATE orders SET subtotal = ?, total = ? + shipping_fee, updated_at = ? WHERE id = ?').run(subtotal, subtotal, Date.now(), o.id);
-    orderEvent(o.id, admin, 'item_edited', `แก้ไขการจอง ${item.product_name} (${item.size_label}): ${T.dt(item.start_at)}/${item.days} วัน/x${item.qty} → ${T.dt(w.startAt)}/${days} วัน/x${qty}`,
+    orderEvent(o.id, admin, 'item_edited', `แก้ไขการจอง ${item.product_name}${item.size_label ? ` (${item.size_label})` : ''}: ${T.dt(item.start_at)}/${item.days} วัน/x${item.qty} → ${T.dt(w.startAt)}/${days} วัน/x${qty}`,
       { before: item, after: { startAt: w.startAt, days, qty, dueAt: w.dueAt } });
   }).immediate();
   sheets.markDirty(order.id);

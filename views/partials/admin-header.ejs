@@ -6,7 +6,7 @@
       <% const nav = [
         ['sec','ภาพรวม'], ['/admin','Dashboard'], ['/admin/calendar','ปฏิทินการจอง'],
         ['sec','การขาย'], ['/admin/orders','คำสั่งซื้อ', adminNav.pending], ['/admin/users','ลูกค้า & สิทธิ์'],
-        ['sec','สินค้า'], ['/admin/products','สินค้าทั้งหมด'], ['/admin/inventory','สต็อก (SKU)'], ['/admin/categories','ประเภทสินค้า'],
+        ['sec','สินค้า'], ['/admin/products','สินค้าทั้งหมด'], ['/admin/inventory','สต็อก'],
         ['sec','ระบบ'], ['/admin/settings','ตั้งค่าร้าน'], ['/admin/system','การเชื่อมต่อ & สำรองข้อมูล'], ['/admin/audit','ประวัติการแก้ไข'],
       ]; %>
       <% nav.forEach(n => { if (n[0] === 'sec') { %><div class="sec"><%= n[1] %></div><% } else {

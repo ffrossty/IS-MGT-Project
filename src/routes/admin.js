@@ -126,28 +126,67 @@ const productUpload = imageUploader('products', { maxMb: 10 });
 
 router.get('/products', (req, res) => {
   const q = req.query.q ? `%${req.query.q}%` : null;
-  const products = db.prepare(`SELECT p.*, c.name AS category_name,
+  const products = db.prepare(`SELECT p.*,
       (SELECT filename FROM product_images WHERE product_id = p.id ORDER BY sort, id LIMIT 1) AS image,
       (SELECT GROUP_CONCAT(size_label || ':' || stock_qty, '  ') FROM (SELECT size_label, stock_qty FROM skus WHERE product_id = p.id AND deleted_at IS NULL ORDER BY sort, id)) AS sizes,
       (SELECT COALESCE(SUM(stock_qty),0) FROM skus WHERE product_id = p.id AND deleted_at IS NULL) AS stock
-    FROM products p LEFT JOIN categories c ON c.id = p.category_id
-    WHERE p.deleted_at IS NULL ${q ? 'AND (p.name LIKE @q OR c.name LIKE @q)' : ''} ORDER BY p.created_at DESC`).all(q ? { q } : {});
+    FROM products p
+    WHERE p.deleted_at IS NULL ${q ? 'AND p.name LIKE @q' : ''} ORDER BY p.created_at DESC`).all(q ? { q } : {});
   res.render('admin/products', { title: 'สินค้า', products });
 });
 
 function productForm(req, res, p, status = 200) {
-  const categories = db.prepare('SELECT * FROM categories ORDER BY sort, name').all();
   const images = p.id ? db.prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort, id').all(p.id) : [];
   const skus = p.id ? db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id').all(p.id) : [];
-  res.status(status).render('admin/product-form', { title: p.id ? `แก้ไข: ${p.name}` : 'เพิ่มสินค้าใหม่', p, categories, images, skus, defaults: { before: getSettings().buffer_before_hours, after: getSettings().buffer_after_hours } });
+  res.status(status).render('admin/product-form', { title: p.id ? `แก้ไข: ${p.name}` : 'เพิ่มสินค้าใหม่', p, images, skus, defaults: { before: getSettings().buffer_before_hours, after: getSettings().buffer_after_hours } });
 }
 
-router.get('/products/new', (req, res) => productForm(req, res, { is_active: 1, base_days: 1, price_tiers: JSON.stringify([{ days: 1, price: 350 }, { days: 3, price: 450 }, { days: 5, price: 550 }]), conditions: '', size_chart: 'Size, อก (นิ้ว), เอว (นิ้ว), สะโพก (นิ้ว), ความยาว (นิ้ว)\n' }));
+router.get('/products/new', (req, res) => productForm(req, res, { is_active: 1, base_days: 1, price_tiers: JSON.stringify([{ days: 1, price: 350 }, { days: 3, price: 450 }, { days: 5, price: 550 }]), conditions: '' }));
 router.get('/products/:id', (req, res, next) => {
   const p = db.prepare('SELECT * FROM products WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
   if (!p) return next();
   productForm(req, res, p);
 });
+
+/** Measurement in inches (0.5 steps allowed); '' → null. */
+function measure(v) {
+  const s = String(v ?? '').trim().replace(',', '.');
+  if (s === '') return null;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n <= 0 || n > 200) throw new O.BookingError('สัดส่วนชุดต้องเป็นตัวเลข (นิ้ว) ระหว่าง 1–200');
+  return Math.round(n * 10) / 10;
+}
+
+/**
+ * One stock line per dress (sizes are no longer used). Keeps the first SKU, sets its stock,
+ * and retires any legacy extra sizes that have no unfinished bookings.
+ */
+function saveSingleStock(req, productId, qtyRaw, size) {
+  const label = size || '';
+  const qty = Math.max(0, int(qtyRaw, 1));
+  const skus = db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id').all(productId);
+  if (!skus.length) {
+    const id = db.prepare('INSERT INTO skus(product_id, size_label, stock_qty, sort) VALUES (?, ?, ?, 0)').run(productId, label, qty).lastInsertRowid;
+    audit(req, 'create', 'sku', id, undefined, { stock: qty });
+    return;
+  }
+  const [main, ...extra] = skus;
+  for (const s of extra) {
+    const future = db.prepare(`SELECT COUNT(*) n FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.sku_id = ? AND oi.block_end > ?
+      AND ${A.ACTIVE_ORDER_SQL.replace(/@now/g, '?')}`).get(s.id, Date.now(), Date.now()).n;
+    if (future) continue;
+    db.prepare('UPDATE skus SET deleted_at = ? WHERE id = ?').run(Date.now(), s.id);
+    db.prepare('DELETE FROM cart_items WHERE sku_id = ?').run(s.id);
+    audit(req, 'delete', 'sku', s.id, s);
+  }
+  // after retiring extras so the (product, size) unique index can't clash
+  if (main.stock_qty !== qty || main.size_label !== label) {
+    const clash = db.prepare('SELECT id FROM skus WHERE product_id = ? AND size_label = ? AND deleted_at IS NULL AND id <> ?').get(productId, label, main.id);
+    if (clash) throw new O.BookingError(`ยังมีการจองค้างอยู่ในไซส์ ${label} เดิม — เปลี่ยนไซส์ได้หลังการจองนั้นเสร็จสิ้น`);
+    db.prepare('UPDATE skus SET size_label = ?, stock_qty = ? WHERE id = ?').run(label, qty, main.id);
+    audit(req, 'update_stock', 'sku', main.id, { size: main.size_label, stock: main.stock_qty }, { size: label, stock: qty });
+  }
+}
 
 function readProduct(b) {
   const opt = (v) => (v === '' || v == null ? null : Math.max(0, int(v)));
@@ -168,9 +207,13 @@ function readProduct(b) {
   const promoEnd = promoType && b.promo_end ? T.parseLocal(b.promo_end) : null;
   if (promoStart && promoEnd && promoEnd <= promoStart) throw new O.BookingError('วันสิ้นสุดโปรโมชั่นต้องหลังวันเริ่ม');
   const p = {
-    name: String(b.name || '').trim().slice(0, 150), category_id: int(b.category_id) || null,
+    name: String(b.name || '').trim().slice(0, 150),
     description: String(b.description || '').slice(0, 5000), conditions: String(b.conditions || '').slice(0, 5000),
-    size_chart: String(b.size_chart || '').slice(0, 5000),
+    size: L.SIZES.includes(b.size) ? b.size : null,
+    ...Object.fromEntries(L.MEASURES.flatMap((m) => {
+      const free = b[`${m.col}_free`] ? 1 : 0;   // Freesize → ไม่ต้องใส่ตัวเลข
+      return [[m.col, free ? null : measure(b[m.col])], [`${m.col}_free`, free]];
+    })),
     price_tiers: JSON.stringify(tiers),
     base_price: tiers[0].price, base_days: tiers[0].days,  // kept in sync for sorting / price filter
     extra_day_price: Math.max(0, int(b.extra_day_price)),
@@ -186,14 +229,13 @@ router.post('/products', productUpload.array('images', 12), (req, res) => {
   const p = readProduct(req.body);
   const now = Date.now();
   const id = db.transaction(() => {
-    const info = db.prepare(`INSERT INTO products(name, category_id, description, conditions, size_chart, base_price, base_days, extra_day_price,
+    const info = db.prepare(`INSERT INTO products(name, description, conditions, size, bust, waist, hip, length, bust_free, waist_free, hip_free, length_free, base_price, base_days, extra_day_price,
       price_tiers, promo_type, promo_value, promo_start, promo_end, promo_label,
-      buffer_before_hours, buffer_after_hours, is_active, created_at, updated_at) VALUES (@name, @category_id, @description, @conditions, @size_chart,
+      buffer_before_hours, buffer_after_hours, is_active, created_at, updated_at) VALUES (@name, @description, @conditions, @size, @bust, @waist, @hip, @length, @bust_free, @waist_free, @hip_free, @length_free,
       @base_price, @base_days, @extra_day_price, @price_tiers, @promo_type, @promo_value, @promo_start, @promo_end, @promo_label,
       @buffer_before_hours, @buffer_after_hours, @is_active, @now, @now)`).run({ ...p, now });
     const pid = info.lastInsertRowid;
-    const labels = [].concat(req.body.new_size || []); const qtys = [].concat(req.body.new_qty || []);
-    labels.forEach((lab, i) => { if (String(lab).trim()) db.prepare('INSERT INTO skus(product_id, size_label, stock_qty, sort) VALUES (?, ?, ?, ?)').run(pid, String(lab).trim().slice(0, 30), Math.max(0, int(qtys[i])), i); });
+    saveSingleStock(req, pid, req.body.stock_qty, p.size);
     verifyImages(req.files).forEach((f, i) => db.prepare('INSERT INTO product_images(product_id, filename, sort) VALUES (?, ?, ?)').run(pid, f.filename, i));
     return pid;
   })();
@@ -207,26 +249,13 @@ router.post('/products/:id', productUpload.array('images', 12), (req, res) => {
   if (!before) return res.redirect('/admin/products');
   const p = readProduct(req.body);
   db.transaction(() => {
-    db.prepare(`UPDATE products SET name=@name, category_id=@category_id, description=@description, conditions=@conditions, size_chart=@size_chart,
+    db.prepare(`UPDATE products SET name=@name, description=@description, conditions=@conditions,
+      size=@size, bust=@bust, waist=@waist, hip=@hip, length=@length,
+      bust_free=@bust_free, waist_free=@waist_free, hip_free=@hip_free, length_free=@length_free,
       base_price=@base_price, base_days=@base_days, extra_day_price=@extra_day_price, price_tiers=@price_tiers,
       promo_type=@promo_type, promo_value=@promo_value, promo_start=@promo_start, promo_end=@promo_end, promo_label=@promo_label, buffer_before_hours=@buffer_before_hours,
       buffer_after_hours=@buffer_after_hours, is_active=@is_active, updated_at=@now WHERE id=@id`).run({ ...p, now: Date.now(), id: before.id });
-    // existing sizes
-    for (const s of db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL').all(before.id)) {
-      const lab = req.body[`size_${s.id}`]; const qty = req.body[`qty_${s.id}`];
-      if (lab === undefined) continue;
-      const newQty = Math.max(0, int(qty, s.stock_qty));
-      const newLabel = String(lab).trim().slice(0, 30) || s.size_label;
-      if (newQty !== s.stock_qty || newLabel !== s.size_label) {
-        db.prepare('UPDATE skus SET size_label = ?, stock_qty = ? WHERE id = ?').run(newLabel, newQty, s.id);
-        audit(req, 'update_stock', 'sku', s.id, { size: s.size_label, stock: s.stock_qty }, { size: newLabel, stock: newQty });
-      }
-    }
-    const labels = [].concat(req.body.new_size || []); const qtys = [].concat(req.body.new_qty || []);
-    labels.forEach((lab, i) => {
-      if (!String(lab).trim()) return;
-      db.prepare('INSERT INTO skus(product_id, size_label, stock_qty, sort) VALUES (?, ?, ?, 100 + ?)').run(before.id, String(lab).trim().slice(0, 30), Math.max(0, int(qtys[i])), i);
-    });
+    saveSingleStock(req, before.id, req.body.stock_qty, p.size);
     const max = db.prepare('SELECT COALESCE(MAX(sort), -1) m FROM product_images WHERE product_id = ?').get(before.id).m;
     verifyImages(req.files).forEach((f, i) => db.prepare('INSERT INTO product_images(product_id, filename, sort) VALUES (?, ?, ?)').run(before.id, f.filename, max + 1 + i));
   })();
@@ -237,7 +266,7 @@ router.post('/products/:id', productUpload.array('images', 12), (req, res) => {
     const items = db.prepare(`SELECT oi.block_start s, oi.block_end e, oi.qty q FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE oi.sku_id = ? AND oi.block_end > ? AND ${A.ACTIVE_ORDER_SQL.replace(/@now/g, '?')}`).all(s.id, Date.now(), Date.now());
     const peak = A.maxConcurrent(items, Date.now(), 8.64e15);
-    if (peak > s.stock_qty) conflicts.push(`${s.size_label} (มีจองซ้อนกันสูงสุด ${peak} ชิ้น แต่สต็อก ${s.stock_qty})`);
+    if (peak > s.stock_qty) conflicts.push(`${s.size_label || 'ชุดนี้'} (มีจองซ้อนกันสูงสุด ${peak} ชิ้น แต่สต็อก ${s.stock_qty})`);
   }
   res.flash(conflicts.length ? 'error' : 'success', conflicts.length ? `บันทึกแล้ว แต่สต็อกน้อยกว่าการจองที่มีอยู่: ${conflicts.join(', ')}` : 'บันทึกการเปลี่ยนแปลงแล้ว — หน้าร้านอัปเดตทันที');
   res.redirect(`/admin/products/${before.id}`);
@@ -339,21 +368,8 @@ router.post('/blocks/:id/delete', (req, res) => {
   res.redirect(b ? `/admin/products/${b.product_id}/calendar` : '/admin/products');
 });
 
-// Categories
-router.get('/categories', (req, res) => {
-  const categories = db.prepare('SELECT c.*, (SELECT COUNT(*) FROM products WHERE category_id = c.id AND deleted_at IS NULL) n FROM categories c ORDER BY sort, name').all();
-  res.render('admin/categories', { title: 'ประเภทสินค้า', categories });
-});
-router.post('/categories', (req, res) => {
-  const name = String(req.body.name || '').trim().slice(0, 60);
-  if (name) { try { db.prepare('INSERT INTO categories(name, sort) VALUES (?, ?)').run(name, int(req.body.sort)); audit(req, 'create', 'category', name); } catch (_) { res.flash('error', 'มีประเภทนี้อยู่แล้ว'); } }
-  res.redirect('/admin/categories');
-});
-router.post('/categories/:id', (req, res) => {
-  if (req.body._action === 'delete') { db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id); audit(req, 'delete', 'category', req.params.id); }
-  else db.prepare('UPDATE categories SET name = ?, sort = ? WHERE id = ?').run(String(req.body.name).trim().slice(0, 60), int(req.body.sort), req.params.id);
-  res.redirect('/admin/categories');
-});
+// (ประเภทสินค้าเลิกใช้แล้ว)
+router.get('/categories', (req, res) => res.redirect('/admin/products'));
 
 // ---------------------------------------------------------------- Inventory
 router.get('/inventory', (req, res) => {
@@ -395,7 +411,7 @@ router.get('/orders', (req, res) => {
   const page = Math.max(1, int(q.page, 1)); const per = 30;
   const total = db.prepare(`SELECT COUNT(*) n FROM orders o WHERE ${where.join(' AND ')}`).get(p).n;
   const orders = db.prepare(`SELECT o.*, u.display_name,
-      (SELECT GROUP_CONCAT(product_name || ' (' || size_label || ') x' || qty, ', ') FROM order_items WHERE order_id = o.id) AS items_text,
+      (SELECT GROUP_CONCAT(product_name || CASE WHEN size_label <> '' THEN ' (' || size_label || ')' ELSE '' END || ' x' || qty, ', ') FROM order_items WHERE order_id = o.id) AS items_text,
       (SELECT MIN(start_at) FROM order_items WHERE order_id = o.id) AS first_start,
       (SELECT MAX(due_at) FROM order_items WHERE order_id = o.id) AS last_due
     FROM orders o JOIN users u ON u.id = o.user_id WHERE ${where.join(' AND ')} ORDER BY o.id DESC LIMIT ${per} OFFSET ${(page - 1) * per}`).all(p);

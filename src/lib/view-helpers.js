@@ -36,4 +36,21 @@ function qs(query, patch) {
   return s ? `?${s}` : '?';
 }
 
-module.exports = { carrierTrackUrl, trackingHtml, esc, orderBadge, paymentBadge, shippingBadge, img, qs };
+/** " (ไซส์ X)" for legacy sized items; '' when the item has no size (current one-size-per-dress model). */
+function sz(label, withWord = false) { return label ? ` (${withWord ? 'ไซส์ ' : ''}${label})` : ''; }
+
+/** One measurement value for display: number (inches), 'Freesize', or null when not set. */
+function measureValue(p, col) {
+  if (p[`${col}_free`]) return 'Freesize';
+  const v = p[col];
+  return v == null || v === '' ? null : String(Math.round(Number(v) * 10) / 10);
+}
+
+/** Measurements text, e.g. "B 34 · W 28 · H Freesize · L 40" (numbers are inches). */
+function measures(p) {
+  const parts = [['B', 'bust'], ['W', 'waist'], ['H', 'hip'], ['L', 'length']]
+    .map(([k, col]) => [k, measureValue(p, col)]).filter(([, v]) => v !== null).map(([k, v]) => `${k} ${v}`);
+  return parts.join(' · ');
+}
+
+module.exports = { sz, measures, measureValue, carrierTrackUrl, trackingHtml, esc, orderBadge, paymentBadge, shippingBadge, img, qs };

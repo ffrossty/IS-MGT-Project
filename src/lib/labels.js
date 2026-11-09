@@ -64,4 +64,14 @@ const NOTIFICATION_TYPE = {
   admin_slip_uploaded: 'แจ้งแอดมิน: สลิปรอตรวจ',
 };
 
-module.exports = { CARRIERS, CARRIER_OTHER, RETURN_METHOD, EXPRESS_ONLY_RETURN_PROVINCES, NOTIFICATION_TYPE, ORDER_STATUS, PAYMENT_STATUS, SHIPPING_STATUS, SHIPPING_ORDER, SHIPPING_METHOD, BLOCK_REASON, PROVINCES };
+/** ไซส์ที่เลือกได้ (ไม่บังคับ) */
+const SIZES = ['Freesize', 'XS', 'S', 'M', 'L', 'XL'];
+/** สัดส่วนชุด */
+const MEASURES = [
+  { key: 'b', col: 'bust', ab: 'B', label: 'Bust', th: 'อก' },
+  { key: 'w', col: 'waist', ab: 'W', label: 'Waist', th: 'เอว' },
+  { key: 'h', col: 'hip', ab: 'H', label: 'Hip', th: 'สะโพก' },
+  { key: 'l', col: 'length', ab: 'L', label: 'Length', th: 'ความยาว' },
+];
+
+module.exports = { SIZES, MEASURES, CARRIERS, CARRIER_OTHER, RETURN_METHOD, EXPRESS_ONLY_RETURN_PROVINCES, NOTIFICATION_TYPE, ORDER_STATUS, PAYMENT_STATUS, SHIPPING_STATUS, SHIPPING_ORDER, SHIPPING_METHOD, BLOCK_REASON, PROVINCES };

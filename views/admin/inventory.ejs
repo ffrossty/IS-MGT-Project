@@ -6,11 +6,11 @@
   <span class="small muted">ตัวเลขด้านล่างเป็นสถานะ ณ ขณะนี้</span>
 </form>
 <div class="card" style="padding:0"><div class="table-wrap"><table class="table">
-  <thead><tr><th>สินค้า / ไซส์</th><th class="right">สต็อกทั้งหมด</th><th class="right">ว่างตอนนี้</th><th class="right">ล็อกชั่วคราว</th><th class="right">จองแล้ว (ยืนยัน)</th><th class="right">กำลังเช่า</th><th class="right">ซัก/ตรวจหลังคืน</th><th class="right">ปิดชั่วคราว</th><% if (from && to) { %><th class="right">ว่างในช่วงที่เลือก</th><% } %><th>ปรับสต็อก</th></tr></thead>
+  <thead><tr><th>สินค้า</th><th class="right">สต็อกทั้งหมด</th><th class="right">ว่างตอนนี้</th><th class="right">ล็อกชั่วคราว</th><th class="right">จองแล้ว (ยืนยัน)</th><th class="right">กำลังเช่า</th><th class="right">ซัก/ตรวจหลังคืน</th><th class="right">ปิดชั่วคราว</th><% if (from && to) { %><th class="right">ว่างในช่วงที่เลือก</th><% } %><th>ปรับสต็อก</th></tr></thead>
   <tbody>
   <% rows.forEach(r => { %>
     <tr>
-      <td><a class="link" href="/admin/products/<%= r.product_id %>/calendar"><%= r.product_name %></a> <span class="badge plain"><%= r.size_label %></span><% if (!r.is_active) { %> <span class="badge muted">ซ่อน</span><% } %></td>
+      <td><a class="link" href="/admin/products/<%= r.product_id %>/calendar"><%= r.product_name %></a> <% if (r.size_label) { %><span class="badge plain"><%= r.size_label %></span><% } %><% if (!r.is_active) { %> <span class="badge muted">ซ่อน</span><% } %></td>
       <td class="right"><strong><%= r.st.stock %></strong></td>
       <td class="right" style="color:<%= r.st.freeNow ? 'var(--ok)' : 'var(--bad)' %>"><strong><%= r.st.freeNow %></strong></td>
       <td class="right"><%= r.st.held %></td>

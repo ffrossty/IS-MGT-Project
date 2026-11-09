@@ -35,7 +35,7 @@
       <button class="btn" type="submit" style="flex:1">ค้นหาชุดที่ว่าง</button>
       <% if (rental.date) { %><a class="btn secondary" href="/?start_date=">ล้าง</a><% } %>
     </div>
-    <% ['category','size','min','max','q','sort','show','qty'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>" data-keep="<%= k %>"><% } }) %>
+    <% ['q','sort','show','size','bmin','bmax','wmin','wmax','hmin','hmax','lmin','lmax','bfs','wfs','hfs','lfs'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>" data-keep="<%= k %>"><% } }) %>
   </form>
   <div class="avail-note">
     <strong>วันว่างของชุด</strong> — ชุดที่มีลูกค้าเช่าอยู่จะแสดง “ว่างประมาณ” ซึ่งนับจากกำหนดคืนของลูกค้าก่อนหน้า บวกเวลาซักและตรวจสภาพชุด
@@ -53,41 +53,46 @@
   <div class="catalog">
     <div class="filters-mobile">
       <button type="button" class="btn secondary sm filters-btn" data-toggle="#filters" style="margin-bottom:14px">ตัวกรอง ⌄</button>
-      <aside class="filters <%= Object.keys(query).some(k=>['category','size','min','max','q'].includes(k)) ? 'open' : '' %>" id="filters">
+      <% const MKEYS = ['size','bmin','bmax','wmin','wmax','hmin','hmax','lmin','lmax','bfs','wfs','hfs','lfs']; const anyFilter = ['q', ...MKEYS].some(k => query[k]); %>
+      <aside class="filters <%= anyFilter ? 'open' : '' %>" id="filters">
         <h4>ค้นหา</h4>
         <form method="get" action="/">
-          <% ['category','size','min','max','sort','show','qty'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>"><% } }) %>
-          <input type="search" name="q" value="<%= query.q || '' %>" placeholder="ชื่อชุด หรือประเภท">
+          <% ['sort','show', ...MKEYS].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>"><% } }) %>
+          <input type="search" name="q" value="<%= query.q || '' %>" placeholder="ชื่อชุด">
         </form>
-        <h4>ประเภท</h4>
-        <div class="chips">
-          <a class="chip <%= !query.category ? 'active' : '' %>" href="<%= h.qs(query, {category: ''}) %>">ทั้งหมด</a>
-          <% categories.forEach(c => { %><a class="chip <%= String(query.category) === String(c.id) ? 'active' : '' %>" href="<%= h.qs(query, {category: c.id}) %>"><%= c.name %></a><% }) %>
-        </div>
-        <h4>ไซส์</h4>
-        <div class="chips">
-          <a class="chip <%= !query.size ? 'active' : '' %>" href="<%= h.qs(query, {size: ''}) %>">ทุกไซส์</a>
-          <% sizes.forEach(s => { %><a class="chip <%= query.size === s ? 'active' : '' %>" href="<%= h.qs(query, {size: s}) %>"><%= s %></a><% }) %>
-        </div>
-        <h4>ช่วงราคา (บาท)</h4>
-        <form method="get" action="/" class="row" style="gap:6px;flex-wrap:nowrap">
-          <% ['category','size','sort','show','q','qty'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>"><% } }) %>
-          <input type="number" name="min" min="0" placeholder="ต่ำสุด" value="<%= query.min || '' %>">
-          <input type="number" name="max" min="0" placeholder="สูงสุด" value="<%= query.max || '' %>">
-          <button class="btn sm secondary">ตกลง</button>
+        <form method="get" action="/" class="measure-filter">
+          <% ['q','sort','show'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>"><% } }) %>
+          <h4 style="margin-bottom:0">ไซส์</h4>
+          <select name="size" aria-label="ไซส์">
+            <option value="">ทุกไซส์</option>
+            <% sizes.forEach(sz => { %><option value="<%= sz %>" <%= measure.size === sz ? 'selected' : '' %>><%= sz %></option><% }) %>
+          </select>
+          <h4 style="margin-bottom:0">สัดส่วน <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(นิ้ว)</span></h4>
+          <% measure.fields.forEach(m => { %>
+            <div class="mf-row" data-fs-wrap>
+              <div class="mf-head">
+                <label class="mf-label" for="f_<%= m.key %>min"><strong><%= m.ab %></strong><span><%= m.label %> · <%= m.th %></span></label>
+                <label class="fs-toggle"><input type="checkbox" name="<%= m.key %>fs" value="1" data-fs <%= m.free ? 'checked' : '' %>><span>Freesize</span></label>
+              </div>
+              <div class="mf-range">
+                <input type="number" id="f_<%= m.key %>min" name="<%= m.key %>min" value="<%= m.free ? '' : (query[m.key + 'min'] || '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="ตั้งแต่">
+                <span class="mf-to">ถึง</span>
+                <input type="number" name="<%= m.key %>max" value="<%= m.free ? '' : (query[m.key + 'max'] || '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="ถึง" aria-label="<%= m.label %> สูงสุด">
+              </div>
+            </div>
+          <% }) %>
+          <div class="row" style="gap:8px;margin-top:4px">
+            <button class="btn sm" style="flex:1">กรอง</button>
+            <% if (measure.active.length || measure.size) { %><a class="btn sm secondary" href="<%= h.qs(query, {size:'',bmin:'',bmax:'',wmin:'',wmax:'',hmin:'',hmax:'',lmin:'',lmax:'',bfs:'',wfs:'',hfs:'',lfs:''}) %>">ล้าง</a><% } %>
+          </div>
+          <p class="small muted" style="margin:2px 0 0">ใส่เฉพาะช่องที่ต้องการก็ได้ เช่น อก 32 ถึง 35 · ติ๊ก Freesize เพื่อดูชุดที่สัดส่วนนั้นเป็นฟรีไซส์ (ไม่ต้องใส่ช่วง)</p>
         </form>
         <h4>การแสดงผล</h4>
         <div class="chips">
           <a class="chip <%= !onlyAvailable ? 'active' : '' %>" href="<%= h.qs(query, {show: ''}) %>">ทุกชุด</a>
           <a class="chip <%= onlyAvailable ? 'active' : '' %>" href="<%= h.qs(query, {show: 'available'}) %>">เฉพาะที่ว่าง</a>
         </div>
-        <% if (rental.startAt && rental.days && !rentalError) { %>
-          <h4>จำนวนที่ต้องการ</h4>
-          <div class="chips">
-            <% [1,2,3,4].forEach(n => { %><a class="chip <%= qtyNeeded === n ? 'active' : '' %>" href="<%= h.qs(query, {qty: n === 1 ? '' : n}) %>"><%= n %> ชุด</a><% }) %>
-          </div>
-        <% } %>
-        <% if (['category','size','min','max','q'].some(k => query[k])) { %><p style="margin-top:16px"><a class="link small" href="/">ล้างตัวกรองทั้งหมด</a></p><% } %>
+        <% if (anyFilter) { %><p style="margin-top:16px"><a class="link small" href="/">ล้างตัวกรองทั้งหมด</a></p><% } %>
       </aside>
     </div>
 
@@ -98,7 +103,7 @@
             <% const nFree = products.filter(p => p.availability === 'available').length; %>
             <%= products.length %> ชุด · ว่าง <strong style="color:var(--ink)"><%= nFree %></strong> ชุด สำหรับ <%= T.date(rental.startAt) %> · <%= rental.days %> วัน
           <% } else { %>
-            <%= products.length %> ชุดในคอลเลกชัน
+            <%= products.length %> ชุดในคอลเลกชัน<% if (measure.size) { %> · ไซส์ <%= measure.size %><% } %><% if (measure.active.length) { %> · <%= measure.active.map(m => m.ab + ' ' + (m.free ? 'Freesize' : m.min != null && m.max != null ? m.min + '–' + m.max : m.min != null ? '≥ ' + m.min : '≤ ' + m.max)).join(', ') %><% } %>
           <% } %>
         </div>
         <form method="get" action="/">
@@ -115,7 +120,7 @@
       <% if (!products.length) { %>
         <div class="empty">
           <h3>ไม่พบชุดที่ตรงกับเงื่อนไข</h3>
-          <p>ลองเปลี่ยนวันที่ ระยะเวลา หรือตัวกรอง</p>
+          <p>ลองเปลี่ยนวันที่ ระยะเวลา หรือขยายช่วงสัดส่วน</p>
           <% if (onlyAvailable) { %><a class="btn secondary sm" href="<%= h.qs(query, {show: ''}) %>">ดูชุดทั้งหมด</a><% } %>
         </div>
       <% } %>
@@ -137,13 +142,11 @@
               <% } else { %><span class="badge muted">ยังไม่มีสต็อก</span><% } %>
             </div>
             <div class="meta">
-              <div class="cat"><%= p.category_name || 'Collection' %></div>
+              <div class="cat">Collection</div>
               <div class="title"><%= p.name %></div>
               <div class="price"><% if (p.promo) { %><span class="sale"><%= baht(p.price) %></span> <s class="was"><%= baht(p.originalPrice) %></s><% } else { %><%= baht(p.price) %><% } %> <small>/ <%= p.priceDays %> วัน</small>
                 <% if (p.promo) { %><span class="promo-tag">-<%= p.percentOff %>%<%= p.promo.label ? ' · ' + p.promo.label : '' %></span><% } %></div>
-              <div class="sizes">
-                <% p.sizes.forEach(s => { %><span class="size-pill <%= (s.available !== null ? s.available < qtyNeeded : s.stock === 0) ? 'off' : '' %>"><%= s.label %></span><% }) %>
-              </div>
+              <% const ms = h.measures(p); if (ms || p.size) { %><div class="measures-line"><% if (p.size) { %><span class="size-pill"><%= p.size %></span><% } %><%= ms %></div><% } %>
             </div>
           </a>
         <% }) %>

@@ -57,7 +57,7 @@
       <h3>ตรวจสอบรายการเช่า</h3>
       <% cart.lines.forEach(l => { %>
         <div style="padding:8px 0;border-bottom:1px solid var(--line-2)">
-          <div class="line" style="padding:0"><span><%= l.product_name %> (<%= l.size_label %>) ×<%= l.qty %></span><span><%= baht(l.lineTotal) %></span></div>
+          <div class="line" style="padding:0"><span><%= l.product_name %><%= h.sz(l.size_label) %> ×<%= l.qty %></span><span><%= baht(l.lineTotal) %></span></div>
           <div class="small muted"><%= T.dt(l.start_at) %> → คืน <%= T.dt(l.window.dueAt) %></div>
         </div>
       <% }) %>

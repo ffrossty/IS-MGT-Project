@@ -91,7 +91,7 @@ async function notify(order, type, text, userId = order.user_id) {
 }
 
 function itemLines(items) {
-  return items.map((it) => `• ${it.product_name} (ไซส์ ${it.size_label}) x${it.qty}\n  เริ่ม ${T.dt(it.start_at)}\n  คืนภายใน ${T.dt(it.due_at)} (${it.days} วัน)`).join('\n');
+  return items.map((it) => `• ${it.product_name}${require('./view-helpers').sz(it.size_label, true)} x${it.qty}\n  เริ่ม ${T.dt(it.start_at)}\n  คืนภายใน ${T.dt(it.due_at)} (${it.days} วัน)`).join('\n');
 }
 
 function bookingConfirmed(order) {
@@ -115,7 +115,7 @@ function shipped(order) {
 
 function itemsShort(order) {
   return db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(order.id)
-    .map((it) => `• ${it.product_name} (ไซส์ ${it.size_label}) x${it.qty} — ${T.dt(it.start_at)}`).join('\n');
+    .map((it) => `• ${it.product_name}${require('./view-helpers').sz(it.size_label, true)} x${it.qty} — ${T.dt(it.start_at)}`).join('\n');
 }
 
 function slipRejected(order, reason) {
@@ -158,7 +158,7 @@ function returnReminder(order, items, now = Date.now()) {
   const due = Math.min(...items.map((i) => i.due_at));
   const mins = Math.max(0, Math.round((due - now) / 60000));
   const left = mins >= 60 ? `${Math.floor(mins / 60)} ชม.${mins % 60 ? ` ${mins % 60} นาที` : ''}` : `${mins} นาที`;
-  const lines = items.map((i) => `• ${i.product_name} (ไซส์ ${i.size_label}) x${i.qty}\n  คืนภายใน ${T.dt(i.due_at)}`).join('\n');
+  const lines = items.map((i) => `• ${i.product_name}${require('./view-helpers').sz(i.size_label, true)} x${i.qty}\n  คืนภายใน ${T.dt(i.due_at)}`).join('\n');
   let text = `⏰ ${st.shop_name}: ใกล้ถึงกำหนดคืนชุด (อีกประมาณ ${left})\nหมายเลขคำสั่งซื้อ: ${order.code}\n\n${lines}\n\n`
     + 'กรุณาส่งคืนชุดภายในเวลาที่กำหนด หากคืนล่าช้าอาจมีค่าปรับตามเงื่อนไขของร้าน\n';
   if (st.shop_phone) text += `ติดต่อร้าน: ${st.shop_phone}\n`;
@@ -171,7 +171,7 @@ function adminReturnSubmitted(order, first = true) {
   const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(order.id);
   const L = require('./labels');
   const text = `📦↩️ ${first ? 'ลูกค้าแจ้งส่งคืนชุด' : 'ลูกค้าแก้ไขข้อมูลส่งคืน'} ${order.code}\nลูกค้า: ${order.recipient_name} · ${order.phone}\n\n`
-    + items.map((i) => `• ${i.product_name} (ไซส์ ${i.size_label}) x${i.qty} — กำหนดคืน ${T.dt(i.due_at)}`).join('\n')
+    + items.map((i) => `• ${i.product_name}${require('./view-helpers').sz(i.size_label, true)} x${i.qty} — กำหนดคืน ${T.dt(i.due_at)}`).join('\n')
     + `\n\nวิธีส่งคืน: ${L.RETURN_METHOD[order.return_method] || order.return_method}${order.return_carrier ? ` (${order.return_carrier})` : ''}\nติดตาม: ${order.return_tracking}`
     + (order.return_note ? `\nหมายเหตุ: ${order.return_note}` : '')
     + `\n\nเมื่อได้รับชุดแล้ว กด "บันทึกรับคืนชุด": ${config.baseUrl}/admin/orders/${order.code}`;

@@ -39,9 +39,9 @@ function rentalFromReq(req) {
  *   unavailable — busy; `nextAt` = estimated earliest start when it can be booked again
  *   out         — no stock at all
  */
-function productCardData(p, rental, qtyNeeded = 1, sizeFilter = null) {
+function productCardData(p, rental, qtyNeeded = 1) {
   const allSkus = db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id').all(p.id);
-  const skus = sizeFilter ? allSkus.filter((s) => s.size_label === sizeFilter) : allSkus;
+  const skus = allSkus;
   const images = db.prepare('SELECT filename FROM product_images WHERE product_id = ? ORDER BY sort, id LIMIT 8').all(p.id).map((r) => r.filename);
   const totalStock = skus.reduce((a, s) => a + s.stock_qty, 0);
   let sizes = allSkus.map((s) => ({ id: s.id, label: s.size_label, stock: s.stock_qty, available: null }));
@@ -71,6 +71,21 @@ function productCardData(p, rental, qtyNeeded = 1, sizeFilter = null) {
   return { ...p, image: images[0] || null, images, sizes, totalStock, availability, nextAt, price: pd.price, originalPrice: pd.original, promo: pd.promo, percentOff: pd.percentOff, priceDays: cardDays };
 }
 
+const { MEASURES, SIZES } = L;
+/** Read ?bmin=&bmax=… ranges from the query (swapped if entered backwards). */
+function readMeasureFilter(q) {
+  const num = (v) => { const n = Number(String(v ?? '').trim().replace(',', '.')); return String(v ?? '').trim() !== '' && Number.isFinite(n) && n >= 0 ? n : null; };
+  const fields = MEASURES.map((m) => {
+    let min = num(q[`${m.key}min`]); let max = num(q[`${m.key}max`]);
+    if (min != null && max != null && min > max) [min, max] = [max, min];
+    const free = q[`${m.key}fs`] === '1';          // ลูกค้าเลือก Freesize สำหรับสัดส่วนนี้ → ไม่ใช้ช่วงตัวเลข
+    if (free) { min = null; max = null; }
+    return { ...m, min, max, free };
+  });
+  const size = SIZES.includes(q.size) ? q.size : null;
+  return { fields, size, active: fields.filter((f) => f.free || f.min != null || f.max != null) };
+}
+
 function availabilityNote() {
   const st = getSettings();
   const fmt = (h) => (h % 24 === 0 ? `${h / 24} วัน` : `${h} ชม.`);
@@ -84,39 +99,45 @@ router.get('/', (req, res) => {
   const q = req.query;
   const where = ['p.is_active = 1', 'p.deleted_at IS NULL'];
   const params = {};
-  if (q.q) { where.push('(p.name LIKE @q OR c.name LIKE @q OR p.description LIKE @q)'); params.q = `%${q.q}%`; }
-  if (q.category) { where.push('p.category_id = @cat'); params.cat = Number(q.category); }
-  if (q.size) { where.push('EXISTS (SELECT 1 FROM skus s WHERE s.product_id = p.id AND s.deleted_at IS NULL AND s.size_label = @size)'); params.size = q.size; }
-  if (q.min) { where.push('p.base_price >= @min'); params.min = Number(q.min); }
-  if (q.max) { where.push('p.base_price <= @max'); params.max = Number(q.max); }
+  if (q.q) { where.push('(p.name LIKE @q OR p.description LIKE @q)'); params.q = `%${q.q}%`; }
+  // สัดส่วน B / W / H / L (นิ้ว): ลูกค้าใส่ช่วง "ตั้งแต่ … ถึง …" — ชุดที่ค่าอยู่ในช่วงเท่านั้นที่แสดง
+  const measure = readMeasureFilter(q);
+  //   • Freesize → เฉพาะชุดที่สัดส่วนนั้นเป็น Freesize
+  //   • ช่วงตัวเลข → ชุดที่ค่าอยู่ในช่วง + ชุดที่สัดส่วนนั้นเป็น Freesize (ใส่ได้ทุกขนาด)
+  for (const m of measure.active) {
+    if (m.free) { where.push(`p.${m.col}_free = 1`); continue; }
+    const cond = [];
+    if (m.min != null) { cond.push(`p.${m.col} >= @${m.key}min`); params[`${m.key}min`] = m.min; }
+    if (m.max != null) { cond.push(`p.${m.col} <= @${m.key}max`); params[`${m.key}max`] = m.max; }
+    where.push(`(p.${m.col}_free = 1 OR (${cond.join(' AND ')}))`);
+  }
+  if (measure.size) { where.push('p.size = @size'); params.size = measure.size; }
   const sort = { price_asc: 'p.base_price ASC', price_desc: 'p.base_price DESC', popular: 'pop DESC' }[q.sort] || 'p.created_at DESC';
-  const rows = db.prepare(`SELECT p.*, c.name AS category_name,
+  const rows = db.prepare(`SELECT p.*,
       (SELECT COUNT(*) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = p.id AND o.status IN ('confirmed','returned','completed')) AS pop
-    FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE ${where.join(' AND ')} ORDER BY ${sort}`).all(params);
+    FROM products p WHERE ${where.join(' AND ')} ORDER BY ${sort}`).all(params);
 
-  const qtyNeeded = Math.max(1, parseInt(q.qty, 10) || 1);
+  const qtyNeeded = 1;
   let rentalError = null;
   if (rental.startAt && rental.days) rentalError = A.validateRentalRequest(rental.startAt, rental.days);
   else if (rental.date && !rental.startAt) rentalError = 'วันที่ไม่ถูกต้อง';
   const validRental = rental.startAt && rental.days && !rentalError ? rental : { startAt: null, days: null };
-  let products = rows.map((p) => productCardData(p, validRental, qtyNeeded, q.size || null));
+  let products = rows.map((p) => productCardData(p, validRental, qtyNeeded));
   // all dresses are listed by default; bookable ones first (stable within each group)
   const rank = { available: 0, held: 1, unavailable: 2, out: 3 };
   products = products.map((p, i) => ({ p, i })).sort((a, b) => rank[a.p.availability] - rank[b.p.availability] || a.i - b.i).map((x) => x.p);
   const onlyAvailable = q.show === 'available';
   if (onlyAvailable) products = products.filter((p) => p.availability === 'available');
 
-  const categories = db.prepare('SELECT * FROM categories ORDER BY sort, name').all();
-  const sizes = db.prepare("SELECT DISTINCT size_label FROM skus s JOIN products p ON p.id = s.product_id WHERE s.deleted_at IS NULL AND p.deleted_at IS NULL AND p.is_active = 1 ORDER BY size_label").all().map((r) => r.size_label);
   const due = validRental.startAt ? A.windowFor(null, validRental.startAt, validRental.days) : null;
   res.render('shop/home', {
-    title: 'เช่าชุด', products, categories, sizes, rental, rentalError, due, timeOptions: timeOptions(),
+    title: 'เช่าชุด', products, measure, sizes: SIZES, rental, rentalError, due, timeOptions: timeOptions(),
     durations: A.durationOptions(), qtyNeeded, onlyAvailable, totalBeforeFilter: rows.length, note: availabilityNote(),
   });
 });
 
 router.get('/products/:id', (req, res, next) => {
-  const p = db.prepare('SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? AND p.deleted_at IS NULL').get(req.params.id);
+  const p = db.prepare('SELECT p.* FROM products p WHERE p.id = ? AND p.deleted_at IS NULL').get(req.params.id);
   if (!p || (!p.is_active && !(req.user && req.user.role === 'admin'))) return next();
   const rental = rentalFromReq(req);
   const images = db.prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort, id').all(p.id);
@@ -206,7 +227,7 @@ function checkCartLine(userId, skuId, { qty, days, startAt }, ignoreCartId = 0) 
     const ow = A.windowFor(sku, c.start_at, c.days);
     if (ow.blockStart < w.blockEnd && ow.blockEnd > w.blockStart) avail -= c.qty;
   }
-  if (avail < qty) throw new O.BookingError(avail <= 0 ? `${sku.name} ไซส์ ${sku.size_label} ไม่ว่างในช่วงเวลานี้ (รวมรายการในตะกร้าแล้ว)` : `${sku.name} ไซส์ ${sku.size_label} ว่างเพียง ${avail} ชิ้นในช่วงเวลานี้ (รวมรายการในตะกร้าแล้ว)`);
+  if (avail < qty) throw new O.BookingError(avail <= 0 ? `${sku.name}${sku.size_label ? ' ไซส์ ' + sku.size_label : ''} ไม่ว่างในช่วงเวลานี้ (รวมรายการในตะกร้าแล้ว)` : `${sku.name}${sku.size_label ? ' ไซส์ ' + sku.size_label : ''} ว่างเพียง ${avail} ชิ้นในช่วงเวลานี้ (รวมรายการในตะกร้าแล้ว)`);
   return sku;
 }
 

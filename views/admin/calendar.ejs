@@ -15,9 +15,9 @@
   <% const today = T.toInputDate(Date.now()); days.forEach(d => { const pending = (s) => ['awaiting_payment','pending_approval'].includes(s); %>
     <div class="c <%= T.toInputDate(d.ds) === today ? 'today' : '' %>">
       <div class="d"><%= d.d %> <% if (d.active) { %><span><%= d.active %> ชิ้นถูกเช่า</span><% } %></div>
-      <% d.starts.forEach(i => { %><a class="ev <%= pending(i.status) ? 'hold' : 'out' %>" href="/admin/orders/<%= i.code %>" title="<%= i.product_name %> (<%= i.size_label %>) ×<%= i.qty %> · <%= T.time(i.start_at) %> · <%= i.recipient_name %>">↗ <%= T.time(i.start_at).replace(' น.','') %> <%= i.product_name %> (<%= i.size_label %>)</a><% }) %>
-      <% d.dues.forEach(i => { %><a class="ev <%= pending(i.status) ? 'hold' : 'in' %>" href="/admin/orders/<%= i.code %>" title="คืน <%= i.product_name %> · <%= T.time(i.due_at) %>">↙ <%= T.time(i.due_at).replace(' น.','') %> <%= i.product_name %> (<%= i.size_label %>)</a><% }) %>
-      <% d.blocks.forEach(b => { %><span class="ev blk" title="<%= b.note || '' %>"><%= L.BLOCK_REASON[b.reason] %>: <%= b.product_name %> (<%= b.size_label %>) ×<%= b.qty %></span><% }) %>
+      <% d.starts.forEach(i => { %><a class="ev <%= pending(i.status) ? 'hold' : 'out' %>" href="/admin/orders/<%= i.code %>" title="<%= i.product_name %> <%= h.sz(i.size_label) %> ×<%= i.qty %> · <%= T.time(i.start_at) %> · <%= i.recipient_name %>">↗ <%= T.time(i.start_at).replace(' น.','') %> <%= i.product_name %> <%= h.sz(i.size_label) %></a><% }) %>
+      <% d.dues.forEach(i => { %><a class="ev <%= pending(i.status) ? 'hold' : 'in' %>" href="/admin/orders/<%= i.code %>" title="คืน <%= i.product_name %> · <%= T.time(i.due_at) %>">↙ <%= T.time(i.due_at).replace(' น.','') %> <%= i.product_name %> <%= h.sz(i.size_label) %></a><% }) %>
+      <% d.blocks.forEach(b => { %><span class="ev blk" title="<%= b.note || '' %>"><%= L.BLOCK_REASON[b.reason] %>: <%= b.product_name %> <%= h.sz(b.size_label) %> ×<%= b.qty %></span><% }) %>
     </div>
   <% }) %>
 </div></div>

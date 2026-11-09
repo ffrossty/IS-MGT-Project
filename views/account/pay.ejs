@@ -37,7 +37,7 @@
       <hr>
       <h3>รายการ</h3>
       <% items.forEach(i => { %>
-        <div class="small" style="padding:6px 0;border-bottom:1px solid var(--line-2)"><strong><%= i.product_name %></strong> (<%= i.size_label %>) ×<%= i.qty %> — <%= baht(i.line_total) %><br><span class="muted"><%= T.dt(i.start_at) %> → คืน <%= T.dt(i.due_at) %></span></div>
+        <div class="small" style="padding:6px 0;border-bottom:1px solid var(--line-2)"><strong><%= i.product_name %></strong><%= h.sz(i.size_label) %> ×<%= i.qty %> — <%= baht(i.line_total) %><br><span class="muted"><%= T.dt(i.start_at) %> → คืน <%= T.dt(i.due_at) %></span></div>
       <% }) %>
       <form method="post" action="/orders/<%= o.code %>/cancel" data-confirm="ยืนยันการยกเลิกคำสั่งจองนี้?" style="margin-top:14px">
         <input type="hidden" name="_csrf" value="<%= csrf %>">

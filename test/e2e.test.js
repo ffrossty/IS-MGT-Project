@@ -181,7 +181,7 @@ test('slip upload → pending approval; admin approves and ships', async () => {
   assert.ok(page.text.includes('EF123456789TH'));
 
   // all admin pages render
-  for (const u of ['/admin/orders', '/admin/products', '/admin/products/1', '/admin/products/1/calendar', '/admin/inventory', '/admin/calendar', '/admin/users', '/admin/settings', '/admin/system', '/admin/audit', '/admin/categories', '/admin/products/new']) {
+  for (const u of ['/admin/orders', '/admin/products', '/admin/products/1', '/admin/products/1/calendar', '/admin/inventory', '/admin/calendar', '/admin/users', '/admin/settings', '/admin/system', '/admin/audit', '/admin/products/new']) {
     const r = await admin.get(u); assert.equal(r.status, 200, u);
   }
   // returned → completed releases stock
