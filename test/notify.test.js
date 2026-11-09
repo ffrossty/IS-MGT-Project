@@ -187,8 +187,16 @@ test('customer return: Bangkok must use express; tracking required; admins alert
   // other provinces may use EMS
   const other = makeOrder('confirmed');
   db.prepare("UPDATE orders SET province = 'เชียงใหม่' WHERE id = ?").run(other.order.id);
-  assert.deepEqual(O.returnMethodsFor(O.getOrder(other.order.id)), ['ems', 'express']);
-  await O.submitReturn(O.getOrder(other.order.id), { id: other.order.user_id, role: 'customer' }, { method: 'ems', tracking: 'EF123456789TH' });
+  const oc = O.getOrder(other.order.id); const ocust = { id: other.order.user_id, role: 'customer' };
+  assert.deepEqual(O.returnMethodsFor(oc), ['parcel', 'express']);
+  await assert.rejects(() => O.submitReturn(oc, ocust, { method: 'parcel', carrier: '', tracking: 'X123' }), /บริษัทขนส่ง/);
+  await assert.rejects(() => O.submitReturn(oc, ocust, { method: 'parcel', carrier: 'อื่น ๆ', carrierOther: '', tracking: 'X123' }), /บริษัทขนส่ง/);
+  let r = await O.submitReturn(oc, ocust, { method: 'parcel', carrier: 'Flash Express', tracking: 'TH0123456789' });
+  assert.equal(r.return_method, 'parcel'); assert.equal(r.return_carrier, 'Flash Express');
+  r = await O.submitReturn(oc, ocust, { method: 'parcel', carrier: 'อื่น ๆ', carrierOther: 'Best Express', tracking: 'BE999' });
+  assert.equal(r.return_carrier, 'Best Express');
+  r = await O.submitReturn(oc, ocust, { method: 'express', carrier: 'Flash Express', tracking: 'https://grab.com/x' });
+  assert.equal(r.return_carrier, null, 'carrier only applies to parcel');
 
   // only while the order is out with the customer
   const pend = makeOrder('pending_approval');
@@ -208,4 +216,10 @@ test('mark returned → cleaning buffer from now → order completes by itself',
   assert.equal(O.getOrder(order.id).status, 'returned', 'still cleaning');
   O.runAutoComplete(item.block_end + 1);
   assert.equal(O.getOrder(order.id).status, 'completed');
+});
+
+test('carrier tracking links: Thailand Post only (others shown as text)', () => {
+  const h = require('../src/lib/view-helpers');
+  assert.match(h.carrierTrackUrl('ไปรษณีย์ไทย EMS', 'EF123456789TH'), /track\.thailandpost\.co\.th\/\?trackNumber=EF123456789TH/);
+  assert.equal(h.carrierTrackUrl('Flash Express', 'TH0123'), null);
 });

@@ -208,25 +208,30 @@ async function cancel(order, actor, reason) {
 }
 
 function returnMethodsFor(order) {
-  return L.EXPRESS_ONLY_RETURN_PROVINCES.includes(order.province) ? ['express'] : ['ems', 'express'];
+  return L.EXPRESS_ONLY_RETURN_PROVINCES.includes(order.province) ? ['express'] : ['parcel', 'express'];
 }
 
 /** Customer tells the shop how the clothes are being sent back (can be updated until the shop receives them). */
-async function submitReturn(order, user, { method, tracking, note }) {
+async function submitReturn(order, user, { method, carrier, carrierOther, tracking, note }) {
   const o = getOrder(order.id);
   assertStatus(o, ['confirmed']);
   const allowed = returnMethodsFor(o);
   if (!allowed.includes(method)) {
     throw new BookingError(allowed.length === 1 ? `ลูกค้าใน${o.province}ต้องส่งคืนแบบ${L.RETURN_METHOD.express}เท่านั้น` : 'กรุณาเลือกวิธีส่งคืน');
   }
+  let carrierName = null;
+  if (method === 'parcel') {
+    carrierName = carrier === L.CARRIER_OTHER ? String(carrierOther || '').trim().slice(0, 60) : carrier;
+    if (!carrierName || (carrier !== L.CARRIER_OTHER && !L.CARRIERS.includes(carrier))) throw new BookingError('กรุณาเลือกหรือระบุบริษัทขนส่ง');
+  }
   const t = String(tracking || '').trim().slice(0, 500);
   if (t.length < 3) throw new BookingError('กรุณาใส่เลขพัสดุหรือลิงก์ติดตามการจัดส่ง');
   const n = String(note || '').trim().slice(0, 500) || null;
   const first = !o.return_submitted_at;
   const now = Date.now();
-  db.prepare('UPDATE orders SET return_method = ?, return_tracking = ?, return_note = ?, return_submitted_at = ?, updated_at = ? WHERE id = ?')
-    .run(method, t, n, now, now, o.id);
-  orderEvent(o.id, user, 'return_submitted', `${first ? 'ลูกค้าแจ้งส่งคืนชุด' : 'ลูกค้าแก้ไขข้อมูลส่งคืน'}: ${L.RETURN_METHOD[method]} · ${t}${n ? ` · หมายเหตุ: ${n}` : ''}`);
+  db.prepare('UPDATE orders SET return_method = ?, return_carrier = ?, return_tracking = ?, return_note = ?, return_submitted_at = ?, updated_at = ? WHERE id = ?')
+    .run(method, carrierName, t, n, now, now, o.id);
+  orderEvent(o.id, user, 'return_submitted', `${first ? 'ลูกค้าแจ้งส่งคืนชุด' : 'ลูกค้าแก้ไขข้อมูลส่งคืน'}: ${L.RETURN_METHOD[method]}${carrierName ? ` (${carrierName})` : ''} · ${t}${n ? ` · หมายเหตุ: ${n}` : ''}`);
   sheets.markDirty(o.id);
   Promise.resolve(line.adminReturnSubmitted(getOrder(o.id), first)).catch((e) => console.error('[line] admin alert', e.message));
   return getOrder(o.id);
@@ -268,11 +273,12 @@ async function updateShipping(order, admin, f) {
   assertStatus(o, ['confirmed', 'returned', 'completed']);
   if (f.shipping_status && !L.SHIPPING_STATUS[f.shipping_status]) throw new BookingError('สถานะจัดส่งไม่ถูกต้อง');
   if (f.shipping_method && !L.SHIPPING_METHOD[f.shipping_method]) throw new BookingError('วิธีจัดส่งไม่ถูกต้อง');
-  const before = { shipping_method: o.shipping_method, shipping_status: o.shipping_status, tracking_number: o.tracking_number, express_provider: o.express_provider, express_info: o.express_info, shipped_at: o.shipped_at, shipping_note: o.shipping_note };
+  const before = { shipping_carrier: o.shipping_carrier, shipping_method: o.shipping_method, shipping_status: o.shipping_status, tracking_number: o.tracking_number, express_provider: o.express_provider, express_info: o.express_info, shipped_at: o.shipped_at, shipping_note: o.shipping_note };
   const next = {
     shipping_method: f.shipping_method || o.shipping_method,
     shipping_status: f.shipping_status || o.shipping_status || 'preparing',
     tracking_number: (f.tracking_number || '').trim() || null,
+    shipping_carrier: (f.shipping_carrier === L.CARRIER_OTHER ? String(f.shipping_carrier_other || '').trim().slice(0, 60) : (f.shipping_carrier || '').trim()) || null,
     express_provider: (f.express_provider || '').trim() || null,
     express_info: (f.express_info || '').trim() || null,
     shipping_note: (f.shipping_note || '').trim() || null,
@@ -281,14 +287,14 @@ async function updateShipping(order, admin, f) {
   const idx = (s) => L.SHIPPING_ORDER.indexOf(s);
   const becameShipped = idx(next.shipping_status) >= idx('shipped') && idx(o.shipping_status) < idx('shipped');
   if (becameShipped && !next.shipped_at) next.shipped_at = Date.now();
-  if (next.shipping_method === 'ems' && becameShipped && !next.tracking_number) throw new BookingError('กรุณาระบุ Tracking Number สำหรับ EMS ก่อนเปลี่ยนสถานะเป็นจัดส่งแล้ว');
+  if (next.shipping_method === 'ems' && becameShipped && !next.tracking_number) throw new BookingError('กรุณาระบุเลขพัสดุ (Tracking Number) ก่อนเปลี่ยนสถานะเป็นจัดส่งแล้ว');
   const delivered = next.shipping_status === 'delivered' && o.shipping_status !== 'delivered' ? Date.now() : o.delivered_at;
-  db.prepare(`UPDATE orders SET shipping_method=@shipping_method, shipping_status=@shipping_status, tracking_number=@tracking_number,
+  db.prepare(`UPDATE orders SET shipping_method=@shipping_method, shipping_carrier=@shipping_carrier, shipping_status=@shipping_status, tracking_number=@tracking_number,
     express_provider=@express_provider, express_info=@express_info, shipping_note=@shipping_note, shipped_at=@shipped_at,
     delivered_at=@delivered, updated_at=@now WHERE id=@id`).run({ ...next, delivered, now: Date.now(), id: o.id });
   const changes = Object.keys(next).filter((k) => String(before[k] ?? '') !== String(next[k] ?? ''));
   if (changes.length) {
-    orderEvent(o.id, admin, 'shipping', `อัปเดตการจัดส่ง: ${L.SHIPPING_STATUS[next.shipping_status].th}${next.tracking_number ? ` · Tracking ${next.tracking_number}` : ''}`, { before, after: next });
+    orderEvent(o.id, admin, 'shipping', `อัปเดตการจัดส่ง: ${L.SHIPPING_STATUS[next.shipping_status].th}${next.shipping_carrier ? ` · ${next.shipping_carrier}` : ''}${next.tracking_number ? ` · Tracking ${next.tracking_number}` : ''}`, { before, after: next });
   }
   sheets.markDirty(o.id);
   const notification = becameShipped ? await line.shipped(getOrder(o.id)) : null;

@@ -21,6 +21,13 @@ function trackingHtml(text) {
   const t = String(text || '');
   return esc(t).replace(/https?:\/\/[^\s<>"']+/g, (u) => `<a class="link" href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
 }
+function carrierTrackUrl(carrier, number) {
+  if (!number) return null;
+  if (/ไปรษณีย์|EMS|Thailand Post/i.test(carrier || '') || (!carrier && /^[A-Z]{2}\d{9}TH$/i.test(number))) {
+    return `https://track.thailandpost.co.th/?trackNumber=${encodeURIComponent(number)}`;
+  }
+  return null;
+}
 function img(filename) { return filename ? `/media/products/${encodeURIComponent(filename)}` : '/static/img/placeholder.svg'; }
 function qs(query, patch) {
   const q = { ...query, ...patch };
@@ -29,4 +36,4 @@ function qs(query, patch) {
   return s ? `?${s}` : '?';
 }
 
-module.exports = { trackingHtml, esc, orderBadge, paymentBadge, shippingBadge, img, qs };
+module.exports = { carrierTrackUrl, trackingHtml, esc, orderBadge, paymentBadge, shippingBadge, img, qs };

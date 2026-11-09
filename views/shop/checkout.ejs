@@ -17,8 +17,8 @@
         <h3>วิธีการจัดส่ง</h3>
         <label class="ship-option">
           <input type="radio" name="shipping_method" value="ems" <%= form.shipping_method !== 'express' ? 'checked' : '' %> data-fee="<%= emsFee %>">
-          <strong>ไปรษณีย์ไทย EMS</strong> <span style="float:right"><%= baht(emsFee) %></span>
-          <div class="sub">จัดส่งผ่านไปรษณีย์ไทย พร้อมเลข Tracking สำหรับติดตามพัสดุ</div>
+          <strong>ส่งพัสดุ</strong> <span class="muted small">EMS, Flash, Kerry, J&amp;T หรืออื่น ๆ</span> <span style="float:right"><%= baht(emsFee) %></span>
+          <div class="sub">ร้านจัดส่งผ่านบริษัทขนส่ง พร้อมเลขพัสดุสำหรับติดตาม</div>
         </label>
         <label class="ship-option">
           <input type="radio" name="shipping_method" value="express" <%= form.shipping_method === 'express' ? 'checked' : '' %> data-fee="0">

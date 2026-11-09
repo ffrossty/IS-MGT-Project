@@ -218,6 +218,9 @@ addColumn('orders', 'return_method', 'TEXT');          // customer's return ship
 addColumn('orders', 'return_tracking', 'TEXT');        // tracking number / link given by the customer
 addColumn('orders', 'return_note', 'TEXT');
 addColumn('orders', 'return_submitted_at', 'INTEGER');
+addColumn('orders', 'return_carrier', 'TEXT');         // parcel company chosen by the customer for the return
+addColumn('orders', 'shipping_carrier', 'TEXT');       // parcel company the shop used to ship
+db.prepare("UPDATE orders SET return_method = 'parcel', return_carrier = COALESCE(return_carrier, 'ไปรษณีย์ไทย EMS') WHERE return_method = 'ems'").run();
 
 const DEFAULT_SETTINGS = {
   shop_name: 'GMD Rental',

@@ -70,6 +70,18 @@
       $$('input[name=shipping_method]').forEach((r) => r.addEventListener('change', upd));
     }
 
+    // dependent fields: data-show-if="fieldName=value"
+    const deps = $$('[data-show-if]');
+    if (deps.length) {
+      const sync = () => deps.forEach((el) => {
+        const [name, val] = el.dataset.showIf.split('=');
+        const ctl = $$(`[name="${name}"]`);
+        const cur = ctl.length && ctl[0].type === 'radio' ? (ctl.find((r) => r.checked) || {}).value : (ctl[0] || {}).value;
+        el.hidden = cur !== val;
+      });
+      document.addEventListener('change', sync); sync();
+    }
+
     // checkout: cascading Thai address dropdowns (จังหวัด → เขต/อำเภอ → แขวง/ตำบล → รหัสไปรษณีย์)
     if ($('[data-addr=province]')) setupAddress();
 

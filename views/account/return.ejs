@@ -27,20 +27,35 @@
   <form class="card" method="post" action="/orders/<%= o.code %>/return" style="margin-top:16px">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <h3>แจ้งการส่งคืน</h3>
+    <div class="flash warn" style="margin:0 0 14px">ลูกค้าเป็นผู้รับผิดชอบค่าขนส่งในการส่งคืนทั้งหมด</div>
     <div class="field">
       <label class="req">วิธีส่งคืน</label>
+      <% const cur = form.return_method && methods.includes(form.return_method) ? form.return_method : methods[0];
+         const knownCarrier = L.CARRIERS.includes(form.return_carrier); %>
       <% methods.forEach(m => { %>
         <label class="ship-option">
-          <input type="radio" name="return_method" value="<%= m %>" required <%= (form.return_method || methods[0]) === m ? 'checked' : '' %>>
-          <strong><%= L.RETURN_METHOD[m] %></strong>
-          <div class="sub"><%= m === 'express' ? 'เรียกรถจากแอป Grab หรือ Lalamove ให้มาส่งที่ร้าน ลูกค้าชำระค่าส่งเอง' : 'ส่งพัสดุ EMS ที่ไปรษณีย์ ลูกค้าชำระค่าส่งเอง' %></div>
+          <input type="radio" name="return_method" value="<%= m %>" required <%= cur === m ? 'checked' : '' %>>
+          <strong><%= m === 'parcel' ? 'ส่งพัสดุ (EMS, Flash, Kerry, J&T หรืออื่น ๆ)' : L.RETURN_METHOD[m] %></strong>
+          <div class="sub"><%= m === 'express' ? 'เรียกรถจากแอป Grab หรือ Lalamove ให้มาส่งที่ร้าน' : 'ส่งพัสดุที่สาขาของบริษัทขนส่ง แล้วนำเลขพัสดุมากรอกด้านล่าง' %></div>
         </label>
       <% }) %>
       <% if (methods.length === 1) { %><p class="small muted">ลูกค้าในพื้นที่<%= o.province %> ต้องส่งคืนแบบส่งด่วนเท่านั้น เพื่อให้ชุดถึงร้านตรงเวลา</p><% } %>
     </div>
+    <% if (methods.includes('parcel')) { %>
+    <div class="field" data-show-if="return_method=parcel">
+      <label for="return_carrier" class="req">บริษัทขนส่ง</label>
+      <select id="return_carrier" name="return_carrier">
+        <% L.CARRIERS.forEach(c => { %><option <%= form.return_carrier === c ? 'selected' : '' %>><%= c %></option><% }) %>
+        <option value="<%= L.CARRIER_OTHER %>" <%= form.return_carrier && !knownCarrier ? 'selected' : '' %>>อื่น ๆ (ระบุ)</option>
+      </select>
+      <div data-show-if="return_carrier=<%= L.CARRIER_OTHER %>" style="margin-top:8px">
+        <input type="text" name="return_carrier_other" maxlength="60" placeholder="ชื่อบริษัทขนส่ง เช่น Best Express, Shopee Express" value="<%= form.return_carrier && !knownCarrier ? form.return_carrier : '' %>">
+      </div>
+    </div>
+    <% } %>
     <div class="field">
       <label for="return_tracking" class="req">เลขพัสดุ หรือ ลิงก์ติดตามการจัดส่ง</label>
-      <input type="text" id="return_tracking" name="return_tracking" required minlength="3" maxlength="500" value="<%= form.return_tracking || '' %>" placeholder="เช่น ลิงก์แชร์ตำแหน่งจาก Grab/Lalamove หรือเลข EMS เช่น EF123456789TH">
+      <input type="text" id="return_tracking" name="return_tracking" required minlength="3" maxlength="500" value="<%= form.return_tracking || '' %>" placeholder="เช่น เลขพัสดุ EF123456789TH หรือลิงก์แชร์ตำแหน่งจาก Grab/Lalamove">
       <div class="hint">ร้านจะใช้ข้อมูลนี้ติดตามว่าชุดกำลังเดินทางมาถึงไหน</div>
     </div>
     <div class="field">

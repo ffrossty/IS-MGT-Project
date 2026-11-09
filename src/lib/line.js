@@ -102,10 +102,11 @@ function bookingConfirmed(order) {
 }
 
 function shipped(order) {
-  const method = order.shipping_method === 'ems' ? 'ไปรษณีย์ไทย EMS' : `Express Delivery${order.express_provider ? ` (${order.express_provider})` : ''}`;
+  const method = order.shipping_method === 'ems' ? `ส่งพัสดุ${order.shipping_carrier ? ` (${order.shipping_carrier})` : ''}` : `Express Delivery${order.express_provider ? ` (${order.express_provider})` : ''}`;
   let text = `📦 ${getSettings().shop_name}: จัดส่งสินค้าแล้ว\nหมายเลขคำสั่งซื้อ: ${order.code}\nวิธีจัดส่ง: ${method}`;
   if (order.tracking_number) text += `\nTracking: ${order.tracking_number}`;
-  if (order.shipping_method === 'ems' && order.tracking_number) text += `\nตรวจสอบพัสดุ: https://track.thailandpost.co.th/?trackNumber=${encodeURIComponent(order.tracking_number)}`;
+  const trackUrl = order.shipping_method === 'ems' ? require('./view-helpers').carrierTrackUrl(order.shipping_carrier, order.tracking_number) : null;
+  if (trackUrl) text += `\nตรวจสอบพัสดุ: ${trackUrl}`;
   if (order.express_info) text += `\nรายละเอียด: ${order.express_info}`;
   if (order.shipping_note) text += `\nหมายเหตุ: ${order.shipping_note}`;
   text += `\n\nติดตามสถานะคำสั่งซื้อ: ${config.baseUrl}/orders/${order.code}`;
@@ -171,7 +172,7 @@ function adminReturnSubmitted(order, first = true) {
   const L = require('./labels');
   const text = `📦↩️ ${first ? 'ลูกค้าแจ้งส่งคืนชุด' : 'ลูกค้าแก้ไขข้อมูลส่งคืน'} ${order.code}\nลูกค้า: ${order.recipient_name} · ${order.phone}\n\n`
     + items.map((i) => `• ${i.product_name} (ไซส์ ${i.size_label}) x${i.qty} — กำหนดคืน ${T.dt(i.due_at)}`).join('\n')
-    + `\n\nวิธีส่งคืน: ${L.RETURN_METHOD[order.return_method] || order.return_method}\nติดตาม: ${order.return_tracking}`
+    + `\n\nวิธีส่งคืน: ${L.RETURN_METHOD[order.return_method] || order.return_method}${order.return_carrier ? ` (${order.return_carrier})` : ''}\nติดตาม: ${order.return_tracking}`
     + (order.return_note ? `\nหมายเหตุ: ${order.return_note}` : '')
     + `\n\nเมื่อได้รับชุดแล้ว กด "บันทึกรับคืนชุด": ${config.baseUrl}/admin/orders/${order.code}`;
   return notifyAdmins(order, 'admin_return_submitted', text);

@@ -27,15 +27,19 @@ const SHIPPING_STATUS = {
 };
 const SHIPPING_ORDER = ['preparing', 'shipped', 'in_transit', 'delivered'];
 
+// parcel carriers (outbound shipping and customer returns); 'อื่น ๆ' lets the user type a name
+const CARRIERS = ['ไปรษณีย์ไทย EMS', 'Flash Express', 'Kerry Express', 'J&T Express'];
+const CARRIER_OTHER = 'อื่น ๆ';
+
 const RETURN_METHOD = {
-  ems: 'ไปรษณีย์ไทย EMS',
+  parcel: 'ส่งพัสดุ',
   express: 'ส่งด่วน (Grab / Lalamove)',
 };
 // provinces where customers must return by express delivery only
 const EXPRESS_ONLY_RETURN_PROVINCES = ['กรุงเทพมหานคร'];
 
 const SHIPPING_METHOD = {
-  ems: 'ไปรษณีย์ไทย EMS',
+  ems: 'ส่งพัสดุ (EMS, Flash, Kerry, J&T หรืออื่น ๆ)',  // key kept as 'ems' for existing data
   express: 'Express Delivery (Grab / Lalamove)',
 };
 
@@ -60,4 +64,4 @@ const NOTIFICATION_TYPE = {
   admin_slip_uploaded: 'แจ้งแอดมิน: สลิปรอตรวจ',
 };
 
-module.exports = { RETURN_METHOD, EXPRESS_ONLY_RETURN_PROVINCES, NOTIFICATION_TYPE, ORDER_STATUS, PAYMENT_STATUS, SHIPPING_STATUS, SHIPPING_ORDER, SHIPPING_METHOD, BLOCK_REASON, PROVINCES };
+module.exports = { CARRIERS, CARRIER_OTHER, RETURN_METHOD, EXPRESS_ONLY_RETURN_PROVINCES, NOTIFICATION_TYPE, ORDER_STATUS, PAYMENT_STATUS, SHIPPING_STATUS, SHIPPING_ORDER, SHIPPING_METHOD, BLOCK_REASON, PROVINCES };

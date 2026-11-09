@@ -76,7 +76,13 @@
         <div class="form-grid">
           <div class="field"><label>วิธีจัดส่ง</label><select name="shipping_method"><% Object.entries(L.SHIPPING_METHOD).forEach(([k, v]) => { %><option value="<%= k %>" <%= o.shipping_method === k ? 'selected' : '' %>><%= v %></option><% }) %></select></div>
           <div class="field"><label>สถานะการจัดส่ง</label><select name="shipping_status"><% L.SHIPPING_ORDER.forEach(k => { %><option value="<%= k %>" <%= (o.shipping_status || 'preparing') === k ? 'selected' : '' %>><%= L.SHIPPING_STATUS[k].en %> — <%= L.SHIPPING_STATUS[k].th %></option><% }) %></select></div>
-          <div class="field"><label>Tracking Number (EMS)</label><input type="text" name="tracking_number" value="<%= o.tracking_number || '' %>" placeholder="เช่น EF123456789TH" class="mono"></div>
+          <% const knownC = L.CARRIERS.includes(o.shipping_carrier); %>
+          <div class="field"><label>บริษัทขนส่ง (ส่งพัสดุ)</label><select name="shipping_carrier" data-carrier-select>
+            <option value="">- เลือก -</option>
+            <% L.CARRIERS.forEach(c => { %><option <%= o.shipping_carrier === c ? 'selected' : '' %>><%= c %></option><% }) %>
+            <option value="<%= L.CARRIER_OTHER %>" <%= o.shipping_carrier && !knownC ? 'selected' : '' %>>อื่น ๆ (ระบุ)</option></select>
+            <div data-show-if="shipping_carrier=<%= L.CARRIER_OTHER %>" style="margin-top:6px"><input type="text" name="shipping_carrier_other" maxlength="60" placeholder="ชื่อบริษัทขนส่ง" value="<%= o.shipping_carrier && !knownC ? o.shipping_carrier : '' %>"></div></div>
+          <div class="field"><label>เลขพัสดุ (Tracking Number)</label><input type="text" name="tracking_number" value="<%= o.tracking_number || '' %>" placeholder="เช่น EF123456789TH" class="mono"></div>
           <div class="field"><label>วันที่จัดส่ง</label><input type="datetime-local" name="shipped_at" value="<%= o.shipped_at ? T.toInputDateTime(o.shipped_at) : '' %>"></div>
           <div class="field"><label>ผู้ให้บริการด่วน (Express)</label><input type="text" name="express_provider" value="<%= o.express_provider || '' %>" placeholder="Grab / Lalamove"></div>
           <div class="field"><label>ข้อมูลการจัดส่งด่วน</label><input type="text" name="express_info" value="<%= o.express_info || '' %>" placeholder="ชื่อคนขับ / ทะเบียน / ลิงก์ติดตาม"></div>
@@ -95,8 +101,8 @@
         <% } else { %><span class="badge muted">ยังไม่แจ้ง</span><% } %></div>
       <% if (o.return_submitted_at) { %>
         <dl class="kv">
-          <dt>วิธีส่งคืน</dt><dd><%= L.RETURN_METHOD[o.return_method] %></dd>
-          <dt>ติดตามการจัดส่ง</dt><dd style="word-break:break-all"><%- h.trackingHtml(o.return_tracking) %></dd>
+          <dt>วิธีส่งคืน</dt><dd><%= L.RETURN_METHOD[o.return_method] || o.return_method %><%= o.return_carrier ? ` · ${o.return_carrier}` : '' %></dd>
+          <dt>ติดตามการจัดส่ง</dt><dd style="word-break:break-all"><%- h.trackingHtml(o.return_tracking) %><% const ru = h.carrierTrackUrl(o.return_carrier, o.return_tracking); if (o.return_method === 'parcel' && ru && !/^https?:/.test(o.return_tracking)) { %> · <a class="link" target="_blank" rel="noopener" href="<%= ru %>">ตรวจสอบพัสดุ</a><% } %></dd>
           <% if (o.return_note) { %><dt>ข้อความจากลูกค้า</dt><dd><%= o.return_note %></dd><% } %>
           <dt>แจ้งเมื่อ</dt><dd><%= T.dt(o.return_submitted_at) %></dd>
           <dt>กำหนดคืน</dt><dd><%= T.dt(Math.max(...items.map(i => i.due_at))) %></dd>

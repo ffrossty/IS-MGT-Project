@@ -71,11 +71,11 @@ function buildRow(orderId) {
   return [o.code, T.dt(o.created_at), o.recipient_name, o.phone,
     j((i) => i.product_name), j((i) => i.size_label), j((i) => String(i.qty)),
     j((i) => T.dt(i.start_at)), j((i) => T.dt(i.due_at)), j((i) => `${i.days} วัน (${i.days * 24} ชม.)`),
-    o.subtotal, o.shipping_fee, o.total, L.SHIPPING_METHOD[o.shipping_method],
+    o.subtotal, o.shipping_fee, o.total, o.shipping_method === 'ems' ? `ส่งพัสดุ${o.shipping_carrier ? ` (${o.shipping_carrier})` : ''}` : 'Express Delivery',
     (L.PAYMENT_STATUS[o.payment_status] || {}).th || o.payment_status,
     (L.ORDER_STATUS[o.status] || {}).th || o.status,
     o.shipping_status ? L.SHIPPING_STATUS[o.shipping_status].th : '-',
-    o.tracking_number || '', T.dt(Date.now()), o.return_method ? L.RETURN_METHOD[o.return_method] : '', o.return_tracking || '']; // valueInputOption=RAW → never evaluated as formulas
+    o.tracking_number || '', T.dt(Date.now()), o.return_method ? `${L.RETURN_METHOD[o.return_method] || o.return_method}${o.return_carrier ? ` (${o.return_carrier})` : ''}` : '', o.return_tracking || '']; // valueInputOption=RAW → never evaluated as formulas
 }
 
 async function findRow(code) {

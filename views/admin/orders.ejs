@@ -20,14 +20,14 @@
       <td><%= o.recipient_name %><div class="small muted"><%= o.phone %></div></td>
       <td class="small" style="max-width:260px"><%= o.items_text %></td>
       <td class="nowrap small"><%= T.dt(o.first_start) %><br><span class="muted">คืน <%= T.dt(o.last_due) %></span></td>
-      <td class="right nowrap"><%= baht(o.total) %><div class="small muted"><%= o.shipping_method === 'ems' ? 'EMS' : 'Express' %></div></td>
+      <td class="right nowrap"><%= baht(o.total) %><div class="small muted"><%= o.shipping_method === 'ems' ? 'ส่งพัสดุ' : 'Express' %></div></td>
       <td><%- h.orderBadge(o.status) %></td>
       <td><%- h.paymentBadge(o.payment_status) %></td>
       <td><%- h.shippingBadge(o.shipping_status) %></td>
       <td class="small" style="max-width:200px">
         <% if (o.status === 'returned' || o.status === 'completed') { %><span class="badge ok">รับคืนแล้ว</span>
         <% } else if (o.return_submitted_at) { %><span class="badge info">ลูกค้ากำลังส่งคืน</span>
-          <div style="margin-top:4px;word-break:break-all"><%= o.return_method === 'express' ? 'ส่งด่วน' : 'EMS' %> · <%- h.trackingHtml(o.return_tracking) %></div>
+          <div style="margin-top:4px;word-break:break-all"><%= o.return_method === 'express' ? 'ส่งด่วน' : (o.return_carrier || 'ส่งพัสดุ') %> · <%- h.trackingHtml(o.return_tracking) %></div>
         <% } else { %><span class="muted">-</span><% } %>
       </td>
     </tr>

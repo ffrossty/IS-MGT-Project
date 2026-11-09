@@ -73,7 +73,7 @@ router.get('/orders/:code/return', requireLogin, ownOrder, (req, res) => {
 
 router.post('/orders/:code/return', requireLogin, ownOrder, async (req, res, next) => {
   try {
-    await O.submitReturn(req.order, req.user, { method: req.body.return_method, tracking: req.body.return_tracking, note: req.body.return_note });
+    await O.submitReturn(req.order, req.user, { method: req.body.return_method, carrier: req.body.return_carrier, carrierOther: req.body.return_carrier_other, tracking: req.body.return_tracking, note: req.body.return_note });
     res.flash('success', 'แจ้งส่งคืนชุดเรียบร้อย ร้านจะตรวจรับและแจ้งสถานะให้ทราบ');
     res.redirect(`/orders/${req.order.code}`);
   } catch (e) { next(e); }
