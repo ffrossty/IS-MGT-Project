@@ -33,18 +33,41 @@ function rentalFromReq(req) {
   return { date: r.date || '', time: r.time || '', days, startAt };
 }
 
-function productCardData(p, rental, qtyNeeded = 1) {
-  const skus = db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id').all(p.id);
+/**
+ * Card data for the catalog. Every product is listed; status is
+ *   available   — bookable for the chosen window (or, with no dates, at the earliest allowed start)
+ *   unavailable — busy; `nextAt` = estimated earliest start when it can be booked again
+ *   out         — no stock at all
+ */
+function productCardData(p, rental, qtyNeeded = 1, sizeFilter = null) {
+  const allSkus = db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id').all(p.id);
+  const skus = sizeFilter ? allSkus.filter((s) => s.size_label === sizeFilter) : allSkus;
   const image = db.prepare('SELECT filename FROM product_images WHERE product_id = ? ORDER BY sort, id LIMIT 1').get(p.id);
   const totalStock = skus.reduce((a, s) => a + s.stock_qty, 0);
-  let sizes = skus.map((s) => ({ id: s.id, label: s.size_label, stock: s.stock_qty, available: null }));
-  let availability = totalStock > 0 ? 'in_stock' : 'out';
-  if (rental.startAt && rental.days) {
-    const w = A.windowFor(p, rental.startAt, rental.days);
-    sizes = sizes.map((s) => ({ ...s, available: A.availableQty(s.id, w.blockStart, w.blockEnd) }));
-    availability = sizes.some((s) => s.available >= qtyNeeded) ? 'available' : 'unavailable';
+  let sizes = allSkus.map((s) => ({ id: s.id, label: s.size_label, stock: s.stock_qty, available: null }));
+  let availability = 'out'; let nextAt = null;
+  if (totalStock > 0) {
+    const days = rental.days || A.durationOptions()[0] || 1;
+    const from = rental.startAt || Date.now();
+    if (rental.startAt) {
+      const w = A.windowFor(p, rental.startAt, rental.days);
+      sizes = sizes.map((s) => ({ ...s, available: A.availableQty(s.id, w.blockStart, w.blockEnd) }));
+    }
+    const next = A.nextAvailable(p, skus, from, days, qtyNeeded);
+    const earliest = A.roundToOpen(Math.max(from, Date.now() + settingNum('min_advance_hours', 0) * T.HOUR));
+    if (next && next.startAt <= earliest) availability = 'available';
+    else { availability = 'unavailable'; nextAt = next ? next.startAt : null; }
+    if (!rental.startAt) sizes = sizes.map((s) => ({ ...s, available: null }));
   }
-  return { ...p, image: image && image.filename, sizes, totalStock, availability, price: unitPrice(p, rental.days || p.base_days) };
+  return { ...p, image: image && image.filename, sizes, totalStock, availability, nextAt, price: unitPrice(p, rental.days || p.base_days) };
+}
+
+function availabilityNote() {
+  const st = getSettings();
+  const fmt = (h) => (h % 24 === 0 ? `${h / 24} วัน` : `${h} ชม.`);
+  const after = Number(st.buffer_after_hours) || 0; const extra = Number(st.parcel_extra_hours) || 0; const before = Number(st.buffer_before_hours) || 0;
+  return { express: fmt(after), parcel: fmt(after + extra), before: before ? fmt(before) : null,
+    exampleDue: '10 พ.ย. 09:00 น.', exampleExpress: T.dt(T.parseLocal('2026-11-10', '09:00') + (after + before) * T.HOUR), exampleParcel: T.dt(T.parseLocal('2026-11-10', '09:00') + (after + extra + before) * T.HOUR) };
 }
 
 router.get('/', (req, res) => {
@@ -67,9 +90,11 @@ router.get('/', (req, res) => {
   if (rental.startAt && rental.days) rentalError = A.validateRentalRequest(rental.startAt, rental.days);
   else if (rental.date && !rental.startAt) rentalError = 'วันที่ไม่ถูกต้อง';
   const validRental = rental.startAt && rental.days && !rentalError ? rental : { startAt: null, days: null };
-  let products = rows.map((p) => productCardData(p, validRental, qtyNeeded));
-  if (q.size && validRental.startAt) products = products.filter((p) => p.sizes.some((s) => s.label === q.size && s.available >= qtyNeeded));
-  const onlyAvailable = validRental.startAt && q.show !== 'all';
+  let products = rows.map((p) => productCardData(p, validRental, qtyNeeded, q.size || null));
+  // all dresses are listed by default; bookable ones first (stable within each group)
+  const rank = { available: 0, unavailable: 1, out: 2 };
+  products = products.map((p, i) => ({ p, i })).sort((a, b) => rank[a.p.availability] - rank[b.p.availability] || a.i - b.i).map((x) => x.p);
+  const onlyAvailable = q.show === 'available';
   if (onlyAvailable) products = products.filter((p) => p.availability === 'available');
 
   const categories = db.prepare('SELECT * FROM categories ORDER BY sort, name').all();
@@ -77,7 +102,7 @@ router.get('/', (req, res) => {
   const due = validRental.startAt ? A.windowFor(null, validRental.startAt, validRental.days) : null;
   res.render('shop/home', {
     title: 'เช่าชุด', products, categories, sizes, rental, rentalError, due, timeOptions: timeOptions(),
-    durations: A.durationOptions(), qtyNeeded, onlyAvailable, totalBeforeFilter: rows.length,
+    durations: A.durationOptions(), qtyNeeded, onlyAvailable, totalBeforeFilter: rows.length, note: availabilityNote(),
   });
 });
 
@@ -111,7 +136,13 @@ router.get('/api/availability', (req, res) => {
   if (err) return res.json({ ok: false, error: err });
   const w = A.windowFor(sku, startAt, days);
   const available = A.availableQty(sku.id, w.blockStart, w.blockEnd);
-  res.json({ ok: true, available, startLabel: T.dt(w.startAt), dueLabel: T.dt(w.dueAt), hours: w.hours, unitPrice: unitPrice(sku, days) });
+  const qty = Math.max(1, parseInt(req.query.qty, 10) || 1);
+  let nextLabel = null;
+  if (available < qty) {
+    const n = A.nextAvailable(sku, [sku], startAt, days, qty);
+    nextLabel = n ? T.dt(n.startAt) : null;
+  }
+  res.json({ ok: true, available, nextLabel, startLabel: T.dt(w.startAt), dueLabel: T.dt(w.dueAt), hours: w.hours, unitPrice: unitPrice(sku, days) });
 });
 
 /** Month calendar: for each day, how many units are free if the rental starts that day at `time` for `days`. */

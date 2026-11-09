@@ -98,7 +98,7 @@ function createOrderFromCart(user, ship, now = Date.now()) {
       if (!sku || sku.deleted_at || sku.product_deleted || !sku.is_active) { problems.push(`${sku ? sku.product_name : 'สินค้า'}: ไม่เปิดให้เช่าแล้ว`); continue; }
       const err = A.validateRentalRequest(c.start_at, c.days, now);
       if (err) { problems.push(`${sku.product_name} (${sku.size_label}): ${err}`); continue; }
-      const w = A.windowFor(sku, c.start_at, c.days);
+      const w = A.windowFor(sku, c.start_at, c.days, ship.shipping_method);
       // items already inserted for this order are visible to this query → same-SKU lines are counted together
       const avail = A.availableQty(c.sku_id, w.blockStart, w.blockEnd, { sku, now });
       if (avail < c.qty) { problems.push(`${sku.product_name} (${sku.size_label}): ${avail === 0 ? 'ไม่ว่างในช่วงเวลาที่เลือก' : `ว่างเพียง ${avail} ชิ้น`}`); continue; }
@@ -311,7 +311,7 @@ function editItem(order, itemId, admin, { startAt, days, qty }) {
     if (!Number.isFinite(startAt)) throw new BookingError('วันเวลาเริ่มเช่าไม่ถูกต้อง');
     if (!(days > 0) || !(qty > 0)) throw new BookingError('จำนวนวัน/จำนวนชิ้นไม่ถูกต้อง');
     const sku = getSkuFull.get(item.sku_id);
-    const w = A.windowFor(sku, startAt, days);
+    const w = A.windowFor(sku, startAt, days, o.shipping_method);
     const avail = A.availableQty(item.sku_id, w.blockStart, w.blockEnd, { sku, excludeItemId: item.id });
     if (avail < qty) throw new BookingError(`สต็อกไม่พอในช่วงเวลาใหม่ (ว่าง ${avail} ชิ้น)`);
     const price = unitPrice(sku, days);

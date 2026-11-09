@@ -120,9 +120,9 @@ test('booking flow locks stock and prevents double booking', async () => {
 test('a later non-overlapping booking (after cleaning buffer) is allowed', async () => {
   const bob = new Client(); await bob.login('Bob', 'customer');
   db.prepare('DELETE FROM cart_items').run();
-  // Alice: start D 09:00, due D+3 09:00, cleaning 48h → free from D+5 09:00; Bob needs 24h prep → start ≥ D+6 09:00
-  const tooEarly = T.toInputDate(T.parseLocal(startDate) + 5 * T.DAY);
-  const ok = T.toInputDate(T.parseLocal(startDate) + 6 * T.DAY);
+  // Alice (parcel): start D 09:00, due D+3 09:00, cleaning 48h + parcel 72h → free from D+8 09:00; Bob needs 24h prep → start ≥ D+9 09:00
+  const tooEarly = T.toInputDate(T.parseLocal(startDate) + 8 * T.DAY);
+  const ok = T.toInputDate(T.parseLocal(startDate) + 9 * T.DAY);
   const r1 = JSON.parse((await bob.get(`/api/availability?sku=${sku()}&date=${tooEarly}&time=09:00&days=1`)).text);
   assert.equal(r1.available, 0);
   const r2 = JSON.parse((await bob.get(`/api/availability?sku=${sku()}&date=${ok}&time=09:00&days=1`)).text);

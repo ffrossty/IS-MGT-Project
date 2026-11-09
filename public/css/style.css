@@ -387,3 +387,11 @@ dialog::backdrop { background: rgba(31,29,26,.4); }
 .fp-x:hover { background: var(--bad); }
 .file-status .file-clear { margin-left: 6px; padding: 2px 10px; color: var(--bad); text-decoration: underline; }
 .btn.busy { opacity: .7; pointer-events: none; }
+
+/* availability note + busy badge */
+.avail-note { margin-top: 12px; font-size: .86rem; color: var(--ink-2); background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 12px 16px; line-height: 1.6; }
+.avail-note ul { margin: 4px 0 6px; padding-left: 20px; }
+.product-card .img .avail-badge { flex-direction: column; align-items: flex-start; gap: 0; border-radius: 10px; padding: 4px 10px; background: rgba(255,255,255,.94); color: var(--bad); }
+.product-card .img .avail-badge::before { display: none; }
+.product-card .img .avail-badge small { font-size: .72rem; color: var(--ink-2); font-weight: 400; }
+.product-card.busy .img img { filter: grayscale(.35) opacity(.8); }

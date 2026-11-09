@@ -24,9 +24,14 @@ function productBuffers(product) {
   };
 }
 
-function windowFor(product, startAt, days) {
+/**
+ * Occupancy window of one booking. Parcel orders keep the dress out longer
+ * (return transit by post) → `parcel_extra_hours` is added after the cleaning buffer.
+ */
+function windowFor(product, startAt, days, shippingMethod = 'express') {
   const b = productBuffers(product);
-  return rentalWindow(startAt, days, b.before, b.after);
+  const extra = shippingMethod === 'ems' ? settingNum('parcel_extra_hours', 72) : 0;
+  return rentalWindow(startAt, days, b.before, b.after + extra);
 }
 
 const qItems = db.prepare(`
@@ -115,4 +120,45 @@ function skuStatusNow(skuId, now = Date.now()) {
   return { stock: sku.stock_qty, held, booked, renting, cleaning, blockedNow, blocks, freeNow };
 }
 
-module.exports = { ACTIVE_ORDER_SQL, productBuffers, windowFor, intervals, maxConcurrent, availableQty, validateRentalRequest, durationOptions, skuStatusNow };
+/** Move a time to the next allowed start (inside pickup hours, on a :00/:30 slot). */
+function roundToOpen(t) {
+  const st = getSettings();
+  const open = Number(st.pickup_start_hour); const close = Number(st.pickup_end_hour);
+  t = Math.ceil(t / (30 * 60000)) * 30 * 60000;
+  for (let i = 0; i < 400; i++) {
+    const { h, mi } = localParts(t);
+    const m = h * 60 + mi;
+    if (m >= open * 60 && m <= close * 60) return t;
+    // jump to opening time (same day if before opening, otherwise next day)
+    const dayStart = t - (m * 60000);
+    t = (m < open * 60 ? dayStart : dayStart + 24 * HOUR) + open * HOUR;
+  }
+  return t;
+}
+
+/**
+ * Earliest start (>= fromStart) at which `qty` units of any of the given SKUs are free for `days`.
+ * Candidates are fromStart and every time an existing booking/block releases a unit.
+ * Returns { startAt, skuId } or null.
+ */
+function nextAvailable(product, skus, fromStart, days, qty = 1, now = Date.now()) {
+  const minStart = roundToOpen(Math.max(fromStart, now + settingNum('min_advance_hours', 0) * HOUR));
+  const b = productBuffers(product);
+  const horizon = now + settingNum('max_advance_days', 180) * 24 * HOUR;
+  const cands = new Set([minStart]);
+  for (const sku of skus) {
+    for (const iv of intervals(sku.id, minStart - b.before * HOUR, horizon, 0, now)) {
+      if (iv.e + b.before * HOUR > minStart) cands.add(roundToOpen(iv.e + b.before * HOUR));
+    }
+  }
+  const sorted = [...cands].filter((t) => t <= horizon).sort((a, c) => a - c).slice(0, 60);
+  for (const t of sorted) {
+    const w = windowFor(product, t, days);
+    for (const sku of skus) {
+      if (sku.stock_qty >= qty && availableQty(sku.id, w.blockStart, w.blockEnd, { sku, now }) >= qty) return { startAt: t, skuId: sku.id };
+    }
+  }
+  return null;
+}
+
+module.exports = { roundToOpen, nextAvailable, ACTIVE_ORDER_SQL, productBuffers, windowFor, intervals, maxConcurrent, availableQty, validateRentalRequest, durationOptions, skuStatusNow };

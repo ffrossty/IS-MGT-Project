@@ -223,13 +223,13 @@
       const my = ++seq;
       box.className = 'avail-box'; box.textContent = 'กำลังตรวจสอบ…';
       try {
-        const r = await fetch(`/api/availability?sku=${s}&date=${date.value}&time=${encodeURIComponent(time.value)}&days=${days.value}`).then((x) => x.json());
+        const r = await fetch(`/api/availability?sku=${s}&date=${date.value}&time=${encodeURIComponent(time.value)}&days=${days.value}&qty=${parseInt(qty.value, 10) || 1}`).then((x) => x.json());
         if (my !== seq) return;
         if (!r.ok) { box.className = 'avail-box bad'; box.textContent = r.error; setSubmit(false); return; }
         const want = parseInt(qty.value, 10) || 1;
         const enough = r.available >= want;
         box.className = 'avail-box ' + (enough ? 'ok' : 'bad');
-        box.innerHTML = (enough ? `✓ ว่าง <strong>${r.available}</strong> ชิ้นในช่วงนี้` : (r.available ? `ว่างเพียง <strong>${r.available}</strong> ชิ้น (ต้องการ ${want})` : '✕ ไม่ว่างในช่วงเวลานี้ ลองเลือกวันอื่นจากปฏิทิน'))
+        box.innerHTML = (enough ? `✓ ว่าง <strong>${r.available}</strong> ชิ้นในช่วงนี้` : (r.available ? `ว่างเพียง <strong>${r.available}</strong> ชิ้น (ต้องการ ${want})` : '✕ ไม่ว่างในช่วงเวลานี้') + (r.nextLabel ? `<br><span class="small">ว่างอีกครั้งประมาณ <strong>${r.nextLabel}</strong> (เช่า ${days.value} วัน)</span>` : ''))
           + `<br><span class="small">เริ่ม ${r.startLabel} → <strong>คืนภายใน ${r.dueLabel}</strong> (${r.hours} ชม.)</span>`
           + `<br><span class="small">ค่าเช่า ${baht(r.unitPrice)} × ${want} = <strong>${baht(r.unitPrice * want)}</strong></span>`;
         const priceEl = $('[data-price]'); if (priceEl) priceEl.textContent = baht(r.unitPrice);

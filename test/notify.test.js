@@ -223,3 +223,32 @@ test('carrier tracking links: Thailand Post only (others shown as text)', () => 
   assert.match(h.carrierTrackUrl('ไปรษณีย์ไทย EMS', 'EF123456789TH'), /track\.thailandpost\.co\.th\/\?trackNumber=EF123456789TH/);
   assert.equal(h.carrierTrackUrl('Flash Express', 'TH0123'), null);
 });
+
+test('next available = due + cleaning (+3 days for parcel orders) — the shop example', () => {
+  const A = require('../src/lib/availability');
+  const { setSettings } = require('../src/db');
+  setSettings({ buffer_before_hours: '0', buffer_after_hours: '48', parcel_extra_hours: '72', pickup_start_hour: '9', pickup_end_hour: '18' });
+  const now = Date.now();
+  const pid = db.prepare("INSERT INTO products(name, base_price, base_days, created_at, updated_at) VALUES ('Dress A', 500, 1, ?, ?)").run(now, now).lastInsertRowid;
+  const skuId = db.prepare("INSERT INTO skus(product_id, size_label, stock_qty) VALUES (?, 'F', 1)").run(pid).lastInsertRowid;
+  const product = db.prepare('SELECT * FROM products WHERE id = ?').get(pid);
+  const sku = db.prepare('SELECT * FROM skus WHERE id = ?').get(skuId);
+  const book = (method, start) => {
+    const { order } = makeOrder('confirmed');
+    const w = A.windowFor(product, start, 1, method);
+    db.prepare('UPDATE orders SET shipping_method = ? WHERE id = ?').run(method, order.id);
+    db.prepare('UPDATE order_items SET sku_id = ?, product_id = ?, start_at = ?, days = 1, due_at = ?, block_start = ?, block_end = ? WHERE order_id = ?')
+      .run(skuId, pid, start, w.dueAt, w.blockStart, w.blockEnd, order.id);
+    return order;
+  };
+  // rented 9 Dec 09:00 for 1 day → return by 10 Dec 09:00
+  const start = T.parseLocal('2026-12-09', '09:00');
+  const o = book('express', start);
+  const n1 = A.nextAvailable(product, [sku], start, 1, 1, T.parseLocal('2026-12-01', '09:00'));
+  assert.equal(T.toInputDateTime(n1.startAt), '2026-12-12T09:00', 'express: 10 Dec 09:00 + 48h');
+  db.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(o.id);
+  book('ems', start);
+  const n2 = A.nextAvailable(product, [sku], start, 1, 1, T.parseLocal('2026-12-01', '09:00'));
+  assert.equal(T.toInputDateTime(n2.startAt), '2026-12-15T09:00', 'parcel: + 3 more days');
+  setSettings({ buffer_before_hours: '24' });
+});

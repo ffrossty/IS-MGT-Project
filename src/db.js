@@ -237,8 +237,9 @@ const DEFAULT_SETTINGS = {
   notify_admin_slip: '1',          // LINE admins when a customer uploads a slip
   admin_review_hours: '24',        // target time for admin to verify slip
   auto_expire_unreviewed: '0',     // 1 = release stock if admin doesn't review in time
-  buffer_before_hours: '24',       // prepare/ship before rental start
-  buffer_after_hours: '48',        // return transit + inspection + cleaning
+  buffer_before_hours: '0',        // prepare/ship before rental start
+  buffer_after_hours: '48',        // inspection + cleaning after the return deadline (express returns)
+  parcel_extra_hours: '72',        // extra hours added when the order uses parcel shipping (slower return transit)
   pickup_start_hour: '9',          // earliest allowed rental start/return time
   pickup_end_hour: '18',
   min_advance_hours: '3',          // booking must start at least this far ahead
@@ -270,6 +271,12 @@ db.prepare("UPDATE settings SET value = 'GMD Rental' WHERE key = 'shop_name' AND
       }
     })();
   }
+}
+
+// one-time: dresses are bookable again right after cleaning (no extra prep time) — old untouched default 24h → 0
+if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migr_prep_0'").get()) {
+  db.prepare("UPDATE settings SET value = '0' WHERE key = 'buffer_before_hours' AND value = '24'").run();
+  db.prepare("INSERT INTO settings(key, value) VALUES ('migr_prep_0', '1')").run();
 }
 
 // one-time: move the old 48h advance-booking default to 3h (an admin-chosen value other than 48 is kept)

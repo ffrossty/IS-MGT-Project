@@ -37,6 +37,15 @@
     </div>
     <% ['category','size','min','max','q','sort','show','qty'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>" data-keep="<%= k %>"><% } }) %>
   </form>
+  <div class="avail-note">
+    <strong>วันว่างของชุด</strong> — ชุดที่มีลูกค้าเช่าอยู่จะแสดง “ว่างประมาณ” ซึ่งนับจากกำหนดคืนของลูกค้าก่อนหน้า บวกเวลาซักและตรวจสภาพชุด
+    <ul>
+      <li>ลูกค้าก่อนหน้าส่งคืนแบบ<strong>ส่งด่วน</strong> (Grab / Lalamove): + <%= note.express %></li>
+      <li>ลูกค้าก่อนหน้าส่งคืนแบบ<strong>ส่งพัสดุ</strong> (EMS, Flash, Kerry, J&amp;T ฯลฯ): + <%= note.parcel %></li>
+      <% if (note.before) { %><li>และเวลาเตรียมชุดก่อนส่งให้ลูกค้าคนถัดไป <%= note.before %></li><% } %>
+    </ul>
+    <span class="muted">ตัวอย่าง: ลูกค้าคืนชุดภายใน <%= note.exampleDue %> → ส่งด่วน ว่างประมาณ <%= note.exampleExpress %> · ส่งพัสดุ ว่างประมาณ <%= note.exampleParcel %> — หากร้านเตรียมชุดเสร็จก่อน ชุดจะเปิดให้จองได้เร็วกว่าวันที่แสดง</span>
+  </div>
 </section>
 
 <section class="container">
@@ -66,15 +75,15 @@
           <input type="number" name="max" min="0" placeholder="สูงสุด" value="<%= query.max || '' %>">
           <button class="btn sm secondary">ตกลง</button>
         </form>
+        <h4>การแสดงผล</h4>
+        <div class="chips">
+          <a class="chip <%= !onlyAvailable ? 'active' : '' %>" href="<%= h.qs(query, {show: ''}) %>">ทุกชุด</a>
+          <a class="chip <%= onlyAvailable ? 'active' : '' %>" href="<%= h.qs(query, {show: 'available'}) %>">เฉพาะที่ว่าง</a>
+        </div>
         <% if (rental.startAt && rental.days && !rentalError) { %>
           <h4>จำนวนที่ต้องการ</h4>
           <div class="chips">
             <% [1,2,3,4].forEach(n => { %><a class="chip <%= qtyNeeded === n ? 'active' : '' %>" href="<%= h.qs(query, {qty: n === 1 ? '' : n}) %>"><%= n %> ชุด</a><% }) %>
-          </div>
-          <h4>การแสดงผล</h4>
-          <div class="chips">
-            <a class="chip <%= onlyAvailable ? 'active' : '' %>" href="<%= h.qs(query, {show: ''}) %>">เฉพาะที่ว่าง</a>
-            <a class="chip <%= !onlyAvailable ? 'active' : '' %>" href="<%= h.qs(query, {show: 'all'}) %>">ทั้งหมด</a>
           </div>
         <% } %>
         <% if (['category','size','min','max','q'].some(k => query[k])) { %><p style="margin-top:16px"><a class="link small" href="/">ล้างตัวกรองทั้งหมด</a></p><% } %>
@@ -85,7 +94,8 @@
       <div class="row between" style="margin-bottom:16px">
         <div class="muted small">
           <% if (rental.startAt && rental.days && !rentalError) { %>
-            พบ <strong style="color:var(--ink)"><%= products.length %></strong> ชุด<%= onlyAvailable ? 'ที่ว่าง' : '' %> สำหรับ <%= T.date(rental.startAt) %> · <%= rental.days %> วัน
+            <% const nFree = products.filter(p => p.availability === 'available').length; %>
+            <%= products.length %> ชุด · ว่าง <strong style="color:var(--ink)"><%= nFree %></strong> ชุด สำหรับ <%= T.date(rental.startAt) %> · <%= rental.days %> วัน
           <% } else { %>
             <%= products.length %> ชุดในคอลเลกชัน
           <% } %>
@@ -105,18 +115,17 @@
         <div class="empty">
           <h3>ไม่พบชุดที่ตรงกับเงื่อนไข</h3>
           <p>ลองเปลี่ยนวันที่ ระยะเวลา หรือตัวกรอง</p>
-          <% if (onlyAvailable) { %><a class="btn secondary sm" href="<%= h.qs(query, {show: 'all'}) %>">ดูชุดทั้งหมด</a><% } %>
+          <% if (onlyAvailable) { %><a class="btn secondary sm" href="<%= h.qs(query, {show: ''}) %>">ดูชุดทั้งหมด</a><% } %>
         </div>
       <% } %>
       <div class="product-grid">
         <% products.forEach(p => { %>
-          <a class="product-card" href="/products/<%= p.id %>">
+          <a class="product-card <%= p.availability !== 'available' ? 'busy' : '' %>" href="/products/<%= p.id %>">
             <div class="img">
               <img src="<%= h.img(p.image) %>" alt="<%= p.name %>" loading="lazy">
-              <% if (p.availability === 'available') { %><span class="badge ok">ว่างในช่วงที่เลือก</span>
-              <% } else if (p.availability === 'unavailable') { %><span class="badge bad">ไม่ว่างในช่วงที่เลือก</span>
-              <% } else if (p.availability === 'out') { %><span class="badge muted">ยังไม่มีสต็อก</span>
-              <% } else { %><span class="badge plain">พร้อมให้เช่า</span><% } %>
+              <% if (p.availability === 'available') { %><span class="badge ok"><%= rental.startAt && rental.days && !rentalError ? 'ว่างในช่วงที่เลือก' : 'ว่าง พร้อมให้เช่า' %></span>
+              <% } else if (p.availability === 'unavailable') { %><span class="badge bad avail-badge">ไม่ว่าง<% if (p.nextAt) { %><small>ว่างประมาณ <%= T.dt(p.nextAt) %></small><% } else { %><small>สอบถามร้าน</small><% } %></span>
+              <% } else { %><span class="badge muted">ยังไม่มีสต็อก</span><% } %>
             </div>
             <div class="meta">
               <div class="cat"><%= p.category_name || 'Collection' %></div>
