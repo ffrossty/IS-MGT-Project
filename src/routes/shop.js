@@ -65,8 +65,10 @@ function productCardData(p, rental, qtyNeeded = 1, sizeFilter = null) {
     }
     if (!rental.startAt) sizes = sizes.map((s) => ({ ...s, available: null }));
   }
-  const pd = priceDetail(p, rental.days || tiers(p)[0].days);
-  return { ...p, image: images[0] || null, images, sizes, totalStock, availability, nextAt, price: pd.price, originalPrice: pd.original, promo: pd.promo, percentOff: pd.percentOff, priceDays: rental.days || tiers(p)[0].days };
+  // การ์ดในคอลเลกชันแสดงราคาเช่า 1 วันเสมอ (ถ้าสินค้าไม่มีแพ็กเกจ 1 วัน ใช้แพ็กเกจที่สั้นที่สุด)
+  const cardDays = tiers(p)[0].days;
+  const pd = priceDetail(p, cardDays);
+  return { ...p, image: images[0] || null, images, sizes, totalStock, availability, nextAt, price: pd.price, originalPrice: pd.original, promo: pd.promo, percentOff: pd.percentOff, priceDays: cardDays };
 }
 
 function availabilityNote() {
