@@ -103,6 +103,12 @@ test('booking flow locks stock and prevents double booking', async () => {
   const item = db.prepare('SELECT * FROM order_items WHERE order_id = ?').get(o.id);
   assert.equal(item.due_at - item.start_at, 72 * T.HOUR);
 
+  // catalog: held by an unconfirmed booking → yellow "awaiting confirmation", not red "busy"
+  const cat1 = await alice.get(`/?start_date=${startDate}&start_time=09:00&days=3`);
+  assert.ok(cat1.text.includes('รอยืนยันการชำระเงิน') && !cat1.text.includes('avail-badge">ไม่ว่าง'));
+  const api1 = JSON.parse((await alice.get(`/api/availability?sku=${sku()}&date=${startDate}&time=09:00&days=3`)).text);
+  assert.equal(api1.available, 0); assert.equal(api1.held, true);
+
   // Bob's checkout must now fail: overlapping window, stock 1 already held by Alice
   const coBob = await bob.post('/checkout', ship, '/checkout');
   assert.equal(coBob.status, 302); assert.equal(coBob.location, '/cart');
@@ -155,6 +161,9 @@ test('slip upload → pending approval; admin approves and ships', async () => {
   assert.equal(ap.status, 302);
   o = db.prepare('SELECT * FROM orders WHERE code = ?').get(orderCode);
   assert.equal(o.status, 'confirmed'); assert.equal(o.payment_status, 'approved');
+  // catalog: confirmed → red "busy" with an estimated free date
+  const cat2 = await alice.get(`/?start_date=${startDate}&start_time=09:00&days=3`);
+  assert.match(cat2.text, /avail-badge">ไม่ว่าง<small>ว่างประมาณ/);
   // LINE not configured → logged as skipped, never "sent"
   const n = db.prepare('SELECT * FROM notifications WHERE order_id = ?').get(o.id);
   assert.equal(n.status, 'skipped');

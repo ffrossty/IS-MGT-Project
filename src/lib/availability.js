@@ -44,8 +44,15 @@ const qBlocks = db.prepare(`
   WHERE sku_id = @sku AND start_at < @to AND end_at > @from`);
 const qSku = db.prepare('SELECT * FROM skus WHERE id = ? AND deleted_at IS NULL');
 
-function intervals(skuId, from, to, excludeOrderId = 0, now = Date.now(), excludeItemId = 0) {
+// bookings the shop has confirmed (payment approved) — used to tell "busy" apart from "awaiting confirmation"
+const qItemsConfirmed = db.prepare(`
+  SELECT oi.block_start AS s, oi.block_end AS e, oi.qty AS q, o.status, o.id AS order_id
+  FROM order_items oi JOIN orders o ON o.id = oi.order_id
+  WHERE oi.sku_id = @sku AND oi.block_start < @to AND oi.block_end > @from AND o.status IN ('confirmed','returned')`);
+
+function intervals(skuId, from, to, excludeOrderId = 0, now = Date.now(), excludeItemId = 0, confirmedOnly = false) {
   const p = { sku: skuId, from, to, exclude: excludeOrderId || 0, excludeItem: excludeItemId || 0, now };
+  if (confirmedOnly) return [...qItemsConfirmed.all(p).map((r) => ({ ...r, kind: 'order' })), ...qBlocks.all(p).map((r) => ({ ...r, kind: 'block' }))];
   return [...qItems.all(p).map((r) => ({ ...r, kind: 'order' })), ...qBlocks.all(p).map((r) => ({ ...r, kind: 'block' }))];
 }
 
@@ -68,7 +75,7 @@ function maxConcurrent(list, from, to) {
 function availableQty(skuId, from, to, opts = {}) {
   const sku = opts.sku || qSku.get(skuId);
   if (!sku) return 0;
-  const used = maxConcurrent(intervals(skuId, from, to, opts.excludeOrderId, opts.now || Date.now(), opts.excludeItemId), from, to);
+  const used = maxConcurrent(intervals(skuId, from, to, opts.excludeOrderId, opts.now || Date.now(), opts.excludeItemId, opts.confirmedOnly), from, to);
   return Math.max(0, sku.stock_qty - used);
 }
 
@@ -151,13 +158,15 @@ function nextAvailable(product, skus, fromStart, days, qty = 1, now = Date.now()
       if (iv.e + b.before * HOUR > minStart) cands.add(roundToOpen(iv.e + b.before * HOUR));
     }
   }
-  const sorted = [...cands].filter((t) => t <= horizon).sort((a, c) => a - c).slice(0, 60);
-  for (const t of sorted) {
+  const fits = (t) => {
     const w = windowFor(product, t, days);
-    for (const sku of skus) {
-      if (sku.stock_qty >= qty && availableQty(sku.id, w.blockStart, w.blockEnd, { sku, now }) >= qty) return { startAt: t, skuId: sku.id };
-    }
-  }
+    const sku = skus.find((s) => s.stock_qty >= qty && availableQty(s.id, w.blockStart, w.blockEnd, { sku: s, now }) >= qty);
+    return sku ? { startAt: t, skuId: sku.id } : null;
+  };
+  const sorted = [...cands].filter((t) => t <= horizon).sort((a, c) => a - c).slice(0, 60);
+  for (const t of sorted) { const r = fits(t); if (r) return r; }
+  // fallback: step through the calendar (every 3h) in case the candidate list missed a gap
+  for (let t = minStart, i = 0; t <= horizon && i < 1500; t = roundToOpen(t + 3 * HOUR), i++) { const r = fits(t); if (r) return r; }
   return null;
 }
 

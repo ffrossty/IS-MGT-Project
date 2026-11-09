@@ -44,6 +44,7 @@
       <li>ลูกค้าก่อนหน้าส่งคืนแบบ<strong>ส่งพัสดุ</strong> (EMS, Flash, Kerry, J&amp;T ฯลฯ): + <%= note.parcel %></li>
       <% if (note.before) { %><li>และเวลาเตรียมชุดก่อนส่งให้ลูกค้าคนถัดไป <%= note.before %></li><% } %>
     </ul>
+    <span class="muted">ป้าย <strong style="color:var(--warn)">มีผู้จองแล้ว · รอยืนยันการชำระเงิน</strong> = มีลูกค้าจองช่วงนี้และร้านกำลังตรวจสอบการชำระเงิน หากไม่ได้รับการยืนยัน ชุดจะกลับมาว่างอีกครั้ง</span><br>
     <span class="muted">ตัวอย่าง: ลูกค้าคืนชุดภายใน <%= note.exampleDue %> → ส่งด่วน ว่างประมาณ <%= note.exampleExpress %> · ส่งพัสดุ ว่างประมาณ <%= note.exampleParcel %> — หากร้านเตรียมชุดเสร็จก่อน ชุดจะเปิดให้จองได้เร็วกว่าวันที่แสดง</span>
   </div>
 </section>
@@ -120,10 +121,11 @@
       <% } %>
       <div class="product-grid">
         <% products.forEach(p => { %>
-          <a class="product-card <%= p.availability !== 'available' ? 'busy' : '' %>" href="/products/<%= p.id %>">
+          <a class="product-card <%= p.availability === 'unavailable' || p.availability === 'out' ? 'busy' : '' %>" href="/products/<%= p.id %>">
             <div class="img">
               <img src="<%= h.img(p.image) %>" alt="<%= p.name %>" loading="lazy">
               <% if (p.availability === 'available') { %><span class="badge ok"><%= rental.startAt && rental.days && !rentalError ? 'ว่างในช่วงที่เลือก' : 'ว่าง พร้อมให้เช่า' %></span>
+              <% } else if (p.availability === 'held') { %><span class="badge warn avail-badge held">มีผู้จองแล้ว<small>รอยืนยันการชำระเงิน</small></span>
               <% } else if (p.availability === 'unavailable') { %><span class="badge bad avail-badge">ไม่ว่าง<% if (p.nextAt) { %><small>ว่างประมาณ <%= T.dt(p.nextAt) %></small><% } else { %><small>สอบถามร้าน</small><% } %></span>
               <% } else { %><span class="badge muted">ยังไม่มีสต็อก</span><% } %>
             </div>

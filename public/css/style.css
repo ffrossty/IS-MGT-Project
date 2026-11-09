@@ -395,3 +395,5 @@ dialog::backdrop { background: rgba(31,29,26,.4); }
 .product-card .img .avail-badge::before { display: none; }
 .product-card .img .avail-badge small { font-size: .72rem; color: var(--ink-2); font-weight: 400; }
 .product-card.busy .img img { filter: grayscale(.35) opacity(.8); }
+.product-card .img .avail-badge.held { color: var(--warn); }
+.avail-box.held { background: var(--warn-soft); color: #7d5414; }

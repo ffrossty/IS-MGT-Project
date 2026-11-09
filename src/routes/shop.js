@@ -56,7 +56,13 @@ function productCardData(p, rental, qtyNeeded = 1, sizeFilter = null) {
     const next = A.nextAvailable(p, skus, from, days, qtyNeeded);
     const earliest = A.roundToOpen(Math.max(from, Date.now() + settingNum('min_advance_hours', 0) * T.HOUR));
     if (next && next.startAt <= earliest) availability = 'available';
-    else { availability = 'unavailable'; nextAt = next ? next.startAt : null; }
+    else {
+      // busy only because of bookings the admin hasn't confirmed yet → "awaiting confirmation" (still locked)
+      const w = A.windowFor(p, earliest, days);
+      const freeIgnoringHolds = skus.some((sk) => sk.stock_qty >= qtyNeeded && A.availableQty(sk.id, w.blockStart, w.blockEnd, { sku: sk, confirmedOnly: true }) >= qtyNeeded);
+      availability = freeIgnoringHolds ? 'held' : 'unavailable';
+      nextAt = next ? next.startAt : null;
+    }
     if (!rental.startAt) sizes = sizes.map((s) => ({ ...s, available: null }));
   }
   return { ...p, image: image && image.filename, sizes, totalStock, availability, nextAt, price: unitPrice(p, rental.days || p.base_days) };
@@ -92,7 +98,7 @@ router.get('/', (req, res) => {
   const validRental = rental.startAt && rental.days && !rentalError ? rental : { startAt: null, days: null };
   let products = rows.map((p) => productCardData(p, validRental, qtyNeeded, q.size || null));
   // all dresses are listed by default; bookable ones first (stable within each group)
-  const rank = { available: 0, unavailable: 1, out: 2 };
+  const rank = { available: 0, held: 1, unavailable: 2, out: 3 };
   products = products.map((p, i) => ({ p, i })).sort((a, b) => rank[a.p.availability] - rank[b.p.availability] || a.i - b.i).map((x) => x.p);
   const onlyAvailable = q.show === 'available';
   if (onlyAvailable) products = products.filter((p) => p.availability === 'available');
@@ -137,12 +143,13 @@ router.get('/api/availability', (req, res) => {
   const w = A.windowFor(sku, startAt, days);
   const available = A.availableQty(sku.id, w.blockStart, w.blockEnd);
   const qty = Math.max(1, parseInt(req.query.qty, 10) || 1);
-  let nextLabel = null;
+  let nextLabel = null; let held = false;
   if (available < qty) {
-    const n = A.nextAvailable(sku, [sku], startAt, days, qty);
+    held = A.availableQty(sku.id, w.blockStart, w.blockEnd, { confirmedOnly: true }) >= qty;
+    const n = held ? null : A.nextAvailable(sku, [sku], startAt, days, qty);
     nextLabel = n ? T.dt(n.startAt) : null;
   }
-  res.json({ ok: true, available, nextLabel, startLabel: T.dt(w.startAt), dueLabel: T.dt(w.dueAt), hours: w.hours, unitPrice: unitPrice(sku, days) });
+  res.json({ ok: true, available, nextLabel, held, startLabel: T.dt(w.startAt), dueLabel: T.dt(w.dueAt), hours: w.hours, unitPrice: unitPrice(sku, days) });
 });
 
 /** Month calendar: for each day, how many units are free if the rental starts that day at `time` for `days`. */
