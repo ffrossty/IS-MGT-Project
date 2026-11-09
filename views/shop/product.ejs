@@ -4,10 +4,21 @@
   <% if (!p.is_active) { %><div class="flash warn">สินค้านี้ถูกซ่อนจากหน้าร้าน (คุณเห็นเพราะเป็น Admin)</div><% } %>
   <div class="pdp">
     <div class="gallery" data-gallery>
-      <div class="main"><img src="<%= h.img(images[0] && images[0].filename) %>" alt="<%= p.name %>" data-main></div>
+      <div class="main">
+        <% if (images.length > 1) { %>
+          <div class="g-stage" data-stage>
+            <% images.forEach((im, i) => { %><img src="<%= h.img(im.filename) %>" alt="<%= p.name %> (<%= i + 1 %>/<%= images.length %>)" class="<%= i === 0 ? 'is-active' : '' %>" <%= i ? 'loading="lazy"' : '' %>><% }) %>
+          </div>
+          <button type="button" class="g-nav prev" data-step="-1" aria-label="รูปก่อนหน้า"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="g-nav next" data-step="1" aria-label="รูปถัดไป"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="g-count" data-count>1 / <%= images.length %></div>
+        <% } else { %>
+          <img src="<%= h.img(images[0] && images[0].filename) %>" alt="<%= p.name %>">
+        <% } %>
+      </div>
       <% if (images.length > 1) { %>
         <div class="thumbs">
-          <% images.forEach((im, i) => { %><button type="button" class="<%= i===0?'active':'' %>" data-src="<%= h.img(im.filename) %>"><img src="<%= h.img(im.filename) %>" alt=""></button><% }) %>
+          <% images.forEach((im, i) => { %><button type="button" class="<%= i===0?'active':'' %>" data-index="<%= i %>" aria-label="รูปที่ <%= i + 1 %>"><img src="<%= h.img(im.filename) %>" alt=""></button><% }) %>
         </div>
       <% } %>
     </div>

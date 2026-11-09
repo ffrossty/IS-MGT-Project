@@ -24,12 +24,32 @@
     });
     $$('[data-close-dialog]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
 
-    // gallery
+    // product page gallery: arrows, thumbnails, keyboard ← →, swipe
     const g = $('[data-gallery]');
-    if (g) $$('.thumbs button', g).forEach((b) => b.addEventListener('click', () => {
-      $('[data-main]', g).src = b.dataset.src;
-      $$('.thumbs button', g).forEach((x) => x.classList.toggle('active', x === b));
-    }));
+    const stage = g && $('[data-stage]', g);
+    if (stage) {
+      const imgs = $$('img', stage); const thumbs = $$('.thumbs button', g); const count = $('[data-count]', g);
+      let cur = 0;
+      const go = (k) => {
+        k = (k + imgs.length) % imgs.length; if (k === cur) return;
+        imgs[cur].classList.remove('is-active'); imgs[k].classList.add('is-active');
+        thumbs.forEach((t, j) => t.classList.toggle('active', j === k));
+        if (thumbs[k]) thumbs[k].scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+        cur = k; if (count) count.textContent = `${k + 1} / ${imgs.length}`;
+      };
+      $$('.g-nav', g).forEach((b) => b.addEventListener('click', () => go(cur + Number(b.dataset.step))));
+      thumbs.forEach((t) => t.addEventListener('click', () => go(Number(t.dataset.index))));
+      document.addEventListener('keydown', (e) => {
+        if (e.target.closest('input,select,textarea')) return;
+        if (e.key === 'ArrowLeft') go(cur - 1); else if (e.key === 'ArrowRight') go(cur + 1);
+      });
+      let x0 = null;
+      stage.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+      stage.addEventListener('touchend', (e) => {
+        if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+        if (Math.abs(dx) > 40) go(cur + (dx < 0 ? 1 : -1));
+      });
+    }
 
     // qty steppers
     $$('[data-qty]').forEach((q) => {
@@ -98,41 +118,32 @@
     if (book) setupBooking(book);
   });
 
+  /** Catalog cards: first photo at rest; while hovered, cycle through every photo; back to the first on leave. */
   function setupSlides() {
-    const decks = $$('[data-slides]');
-    if (!decks.length) return;
-    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const INTERVAL = 3800;
-    const state = new Map();
-    decks.forEach((deck, n) => {
+    const HOVER_INTERVAL = 1300;
+    $$('[data-slides]').forEach((deck) => {
       const imgs = $$('img', deck);
       const dots = $$('.slide-dots span', deck.parentElement);
-      const st = { i: 0, visible: false, timer: null };
+      const card = deck.closest('.product-card') || deck;
+      let i = 0; let timer = null;
       const show = (k) => {
-        imgs[st.i].classList.remove('is-active'); if (dots[st.i]) dots[st.i].classList.remove('on');
-        st.i = k;
-        imgs[st.i].classList.add('is-active'); if (dots[st.i]) dots[st.i].classList.add('on');
+        imgs[i].classList.remove('is-active'); if (dots[i]) dots[i].classList.remove('on');
+        i = k;
+        imgs[i].classList.add('is-active'); if (dots[i]) dots[i].classList.add('on');
       };
-      st.next = () => show((st.i + 1) % imgs.length);
-      // hovering a card jumps to the next photo right away
-      const card = deck.closest('.product-card');
-      if (card) card.addEventListener('mouseenter', () => { st.next(); restart(); });
-      const restart = () => {
-        clearInterval(st.timer); clearTimeout(st.start);
-        if (reduced || !st.visible || document.hidden) return;
-        st.start = setTimeout(() => { st.next(); st.timer = setInterval(st.next, INTERVAL); }, INTERVAL + (n % 4) * 700);
+      const start = () => {
+        clearInterval(timer);
+        // preload the others the first time the card is hovered
+        imgs.forEach((im) => { im.loading = 'eager'; });
+        show((i + 1) % imgs.length);
+        timer = setInterval(() => show((i + 1) % imgs.length), HOVER_INTERVAL);
       };
-      st.restart = restart;
-      state.set(deck, st);
+      const stop = () => { clearInterval(timer); timer = null; if (i !== 0) show(0); };
+      card.addEventListener('mouseenter', start);
+      card.addEventListener('mouseleave', stop);
+      card.addEventListener('focusin', start);
+      card.addEventListener('focusout', stop);
     });
-    if ('IntersectionObserver' in window) {
-      const io = new IntersectionObserver((entries) => entries.forEach((en) => {
-        const st = state.get(en.target); if (!st) return;
-        st.visible = en.isIntersecting; st.restart();
-      }), { threshold: 0.25 });
-      decks.forEach((d) => io.observe(d));
-    } else { state.forEach((st) => { st.visible = true; st.restart(); }); }
-    document.addEventListener('visibilitychange', () => state.forEach((st) => st.restart()));
   }
 
   function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
