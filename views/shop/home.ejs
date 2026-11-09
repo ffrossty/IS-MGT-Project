@@ -123,7 +123,14 @@
         <% products.forEach(p => { %>
           <a class="product-card <%= p.availability === 'unavailable' || p.availability === 'out' ? 'busy' : '' %>" href="/products/<%= p.id %>">
             <div class="img">
-              <img src="<%= h.img(p.image) %>" alt="<%= p.name %>" loading="lazy">
+              <% if (p.images.length > 1) { %>
+                <div class="slides" data-slides>
+                  <% p.images.forEach((f, i) => { %><img src="<%= h.img(f) %>" alt="<%= p.name %><%= i ? ' (' + (i + 1) + ')' : '' %>" loading="lazy" class="<%= i === 0 ? 'is-active' : '' %>"><% }) %>
+                </div>
+                <div class="slide-dots" aria-hidden="true"><% p.images.forEach((f, i) => { %><span class="<%= i === 0 ? 'on' : '' %>"></span><% }) %></div>
+              <% } else { %>
+                <img src="<%= h.img(p.image) %>" alt="<%= p.name %>" loading="lazy">
+              <% } %>
               <% if (p.availability === 'available') { %><span class="badge ok"><%= rental.startAt && rental.days && !rentalError ? 'ว่างในช่วงที่เลือก' : 'ว่าง พร้อมให้เช่า' %></span>
               <% } else if (p.availability === 'held') { %><span class="badge warn avail-badge held">มีผู้จองแล้ว<small>รอยืนยันการชำระเงิน</small></span>
               <% } else if (p.availability === 'unavailable') { %><span class="badge bad avail-badge">ไม่ว่าง<% if (p.nextAt) { %><small>ว่างประมาณ <%= T.dt(p.nextAt) %></small><% } else { %><small>สอบถามร้าน</small><% } %></span>

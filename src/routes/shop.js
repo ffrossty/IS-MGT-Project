@@ -42,7 +42,7 @@ function rentalFromReq(req) {
 function productCardData(p, rental, qtyNeeded = 1, sizeFilter = null) {
   const allSkus = db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id').all(p.id);
   const skus = sizeFilter ? allSkus.filter((s) => s.size_label === sizeFilter) : allSkus;
-  const image = db.prepare('SELECT filename FROM product_images WHERE product_id = ? ORDER BY sort, id LIMIT 1').get(p.id);
+  const images = db.prepare('SELECT filename FROM product_images WHERE product_id = ? ORDER BY sort, id LIMIT 8').all(p.id).map((r) => r.filename);
   const totalStock = skus.reduce((a, s) => a + s.stock_qty, 0);
   let sizes = allSkus.map((s) => ({ id: s.id, label: s.size_label, stock: s.stock_qty, available: null }));
   let availability = 'out'; let nextAt = null;
@@ -66,7 +66,7 @@ function productCardData(p, rental, qtyNeeded = 1, sizeFilter = null) {
     if (!rental.startAt) sizes = sizes.map((s) => ({ ...s, available: null }));
   }
   const pd = priceDetail(p, rental.days || tiers(p)[0].days);
-  return { ...p, image: image && image.filename, sizes, totalStock, availability, nextAt, price: pd.price, originalPrice: pd.original, promo: pd.promo, percentOff: pd.percentOff, priceDays: rental.days || tiers(p)[0].days };
+  return { ...p, image: images[0] || null, images, sizes, totalStock, availability, nextAt, price: pd.price, originalPrice: pd.original, promo: pd.promo, percentOff: pd.percentOff, priceDays: rental.days || tiers(p)[0].days };
 }
 
 function availabilityNote() {

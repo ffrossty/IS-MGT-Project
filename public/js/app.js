@@ -90,10 +90,50 @@
     // checkout: cascading Thai address dropdowns (จังหวัด → เขต/อำเภอ → แขวง/ตำบล → รหัสไปรษณีย์)
     if ($('[data-addr=province]')) setupAddress();
 
+    // catalog: rotate product photos (staggered per card, only while visible, paused on reduced motion)
+    setupSlides();
+
     // product page booking box
     const book = $('#book');
     if (book) setupBooking(book);
   });
+
+  function setupSlides() {
+    const decks = $$('[data-slides]');
+    if (!decks.length) return;
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const INTERVAL = 3800;
+    const state = new Map();
+    decks.forEach((deck, n) => {
+      const imgs = $$('img', deck);
+      const dots = $$('.slide-dots span', deck.parentElement);
+      const st = { i: 0, visible: false, timer: null };
+      const show = (k) => {
+        imgs[st.i].classList.remove('is-active'); if (dots[st.i]) dots[st.i].classList.remove('on');
+        st.i = k;
+        imgs[st.i].classList.add('is-active'); if (dots[st.i]) dots[st.i].classList.add('on');
+      };
+      st.next = () => show((st.i + 1) % imgs.length);
+      // hovering a card jumps to the next photo right away
+      const card = deck.closest('.product-card');
+      if (card) card.addEventListener('mouseenter', () => { st.next(); restart(); });
+      const restart = () => {
+        clearInterval(st.timer); clearTimeout(st.start);
+        if (reduced || !st.visible || document.hidden) return;
+        st.start = setTimeout(() => { st.next(); st.timer = setInterval(st.next, INTERVAL); }, INTERVAL + (n % 4) * 700);
+      };
+      st.restart = restart;
+      state.set(deck, st);
+    });
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => entries.forEach((en) => {
+        const st = state.get(en.target); if (!st) return;
+        st.visible = en.isIntersecting; st.restart();
+      }), { threshold: 0.25 });
+      decks.forEach((d) => io.observe(d));
+    } else { state.forEach((st) => { st.visible = true; st.restart(); }); }
+    document.addEventListener('visibilitychange', () => state.forEach((st) => st.restart()));
+  }
 
   function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
 
