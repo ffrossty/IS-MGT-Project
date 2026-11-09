@@ -87,44 +87,77 @@
     const previews = document.createElement('div'); previews.className = 'file-previews';
     host.appendChild(status); host.appendChild(previews);
     const maxMb = Number(input.dataset.maxMb || 10);
+    const maxFiles = input.multiple ? 12 : 1;
     const okTypes = (input.accept || 'image/').split(',').map((t) => t.trim());
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    let selected = [];
 
-    const show = () => {
+    const setFiles = (files) => {
+      selected = files.slice(0, maxFiles);
+      const dt = new DataTransfer();
+      selected.forEach((f) => dt.items.add(f));
+      input.files = dt.files;
+      render();
+    };
+    // clicks on our buttons must not open the file picker (they sit inside the <label>)
+    const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+    function render() {
       previews.innerHTML = '';
-      const files = Array.from(input.files || []);
       if (zone) zone.classList.remove('has-file', 'has-error');
-      if (!files.length) { status.hidden = true; input.dataset.invalid = ''; return; }
+      if (!selected.length) { status.hidden = true; input.dataset.invalid = ''; return; }
       const errors = [];
-      files.forEach((f) => {
+      selected.forEach((f) => {
         if (!okTypes.some((t) => (t.endsWith('/') ? f.type.startsWith(t) : f.type === t))) errors.push(`${f.name}: ไม่ใช่ไฟล์รูปที่รองรับ (JPG, PNG, WEBP)`);
         else if (f.size > maxMb * 1048576) errors.push(`${f.name}: ขนาด ${fmtSize(f.size)} เกินกำหนด ${maxMb} MB`);
       });
       input.dataset.invalid = errors.length ? '1' : '';
       status.hidden = false;
+      const total = selected.reduce((a, f) => a + f.size, 0);
       if (errors.length) {
         status.className = 'file-status bad';
-        status.innerHTML = '✕ แนบไฟล์ไม่สำเร็จ<ul>' + errors.map((m) => `<li>${m.replace(/</g, '&lt;')}</li>`).join('') + '</ul>';
+        status.innerHTML = '✕ มีไฟล์ที่ใช้ไม่ได้ — กด × เพื่อลบไฟล์นั้นออก<ul>' + errors.map((m) => `<li>${esc(m)}</li>`).join('') + '</ul>';
         if (zone) zone.classList.add('has-error');
-        return;
+      } else {
+        status.className = 'file-status ok';
+        status.innerHTML = selected.length === 1
+          ? `✓ แนบรูปแล้ว: <strong>${esc(selected[0].name)}</strong> (${fmtSize(selected[0].size)})`
+          : `✓ แนบรูปแล้ว <strong>${selected.length} รูป</strong> (รวม ${fmtSize(total)})`;
+        status.innerHTML += input.multiple ? ' · กดกรอบเพื่อเพิ่มรูป · กด × เพื่อลบ' : ' · กด × เพื่อลบ หรือกดกรอบเพื่อเปลี่ยนรูป';
+        if (zone) zone.classList.add('has-file');
       }
-      status.className = 'file-status ok';
-      const total = files.reduce((a, f) => a + f.size, 0);
-      status.innerHTML = files.length === 1
-        ? `✓ แนบรูปแล้ว: <strong>${files[0].name.replace(/</g, '&lt;')}</strong> (${fmtSize(files[0].size)})${zone ? ' · แตะอีกครั้งเพื่อเปลี่ยนรูป' : ''}`
-        : `✓ แนบรูปแล้ว <strong>${files.length} รูป</strong> (รวม ${fmtSize(total)}) · กดบันทึกเพื่ออัปโหลด`;
-      if (zone) zone.classList.add('has-file');
-      files.forEach((f) => { const im = document.createElement('img'); im.alt = f.name; im.src = URL.createObjectURL(f); previews.appendChild(im); });
+      const clear = document.createElement('button');
+      clear.type = 'button'; clear.className = 'btn sm ghost file-clear'; clear.textContent = selected.length > 1 ? 'ล้างทั้งหมด' : 'ลบรูปนี้';
+      clear.addEventListener('click', (e) => { stop(e); setFiles([]); });
+      status.appendChild(clear);
+      selected.forEach((f, i) => {
+        const item = document.createElement('div'); item.className = 'fp';
+        const ok = okTypes.some((t) => (t.endsWith('/') ? f.type.startsWith(t) : f.type === t));
+        if (ok) { const im = document.createElement('img'); im.alt = f.name; im.src = URL.createObjectURL(f); item.appendChild(im); }
+        else { const ph = document.createElement('div'); ph.className = 'fp-bad'; ph.textContent = f.name; item.appendChild(ph); }
+        const x = document.createElement('button');
+        x.type = 'button'; x.className = 'fp-x'; x.textContent = '×'; x.title = `ลบ ${f.name}`; x.setAttribute('aria-label', `ลบ ${f.name}`);
+        x.addEventListener('click', (e) => { stop(e); setFiles(selected.filter((_, j) => j !== i)); });
+        item.appendChild(x);
+        previews.appendChild(item);
+      });
+    }
+
+    const key = (f) => `${f.name}|${f.size}|${f.lastModified}`;
+    const addFiles = (incoming) => {
+      if (!input.multiple) return setFiles(incoming.slice(0, 1));
+      const seen = new Set(selected.map(key));
+      const merged = selected.concat(incoming.filter((f) => !seen.has(key(f))));
+      if (merged.length > maxFiles) window.alert(`แนบได้สูงสุด ${maxFiles} รูปต่อครั้ง`);
+      setFiles(merged);
     };
-    input.addEventListener('change', show);
+    input.addEventListener('change', () => addFiles(Array.from(input.files || [])));
     if (zone) {
       ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add('dragover'); }));
       ['dragleave', 'drop'].forEach((ev) => zone.addEventListener(ev, () => zone.classList.remove('dragover')));
       zone.addEventListener('drop', (e) => {
         e.preventDefault();
-        if (!e.dataTransfer || !e.dataTransfer.files.length) return;
-        const dt = new DataTransfer();
-        Array.from(e.dataTransfer.files).slice(0, input.multiple ? 12 : 1).forEach((f) => dt.items.add(f));
-        input.files = dt.files; show();
+        if (e.dataTransfer && e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files));
       });
     }
   }

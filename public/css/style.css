@@ -380,5 +380,10 @@ dialog::backdrop { background: rgba(31,29,26,.4); }
 .file-status.bad { background: var(--bad-soft); color: #8c342b; }
 .file-status ul { margin: 6px 0 0; padding-left: 18px; }
 .file-previews { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin-top: 10px; }
-.file-previews img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.file-previews .fp { position: relative; }
+.file-previews img, .file-previews .fp-bad { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.file-previews .fp-bad { display: grid; place-items: center; padding: 6px; font-size: .7rem; text-align: center; word-break: break-all; background: var(--bad-soft); color: var(--bad); border-color: #e3b1aa; }
+.fp-x { position: absolute; top: -7px; right: -7px; width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; background: var(--ink); color: #fff; font-size: 16px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+.fp-x:hover { background: var(--bad); }
+.file-status .file-clear { margin-left: 6px; padding: 2px 10px; color: var(--bad); text-decoration: underline; }
 .btn.busy { opacity: .7; pointer-events: none; }
