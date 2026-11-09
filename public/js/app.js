@@ -47,14 +47,15 @@
       const t = setInterval(tick, 1000); tick();
     });
 
-    // slip / image preview
-    $$('[data-dropzone]').forEach((z) => {
-      const input = $('input[type=file]', z); const img = $('img.preview', z);
-      input.addEventListener('change', () => {
-        const f = input.files[0];
-        if (f && img) { img.src = URL.createObjectURL(f); img.hidden = false; }
-      });
-    });
+    // file attach feedback: file name, size, preview, type/size validation
+    $$('input[type=file]').forEach(setupFileInput);
+    // multipart forms: show progress state, prevent double submit
+    $$('form[enctype="multipart/form-data"]').forEach((f) => f.addEventListener('submit', (e) => {
+      const bad = $$('input[type=file]', f).some((i) => i.dataset.invalid === '1');
+      if (bad) { e.preventDefault(); window.alert('ไฟล์ที่แนบไม่ถูกต้อง กรุณาเลือกใหม่'); return; }
+      const b = $('button[data-busy]', f) || e.submitter;
+      if (b && b.dataset.busy) { b.textContent = b.dataset.busy; b.classList.add('busy'); }
+    }));
 
     // checkout: live shipping fee
     const total = $('[data-total]');
@@ -75,6 +76,58 @@
     const book = $('#book');
     if (book) setupBooking(book);
   });
+
+  function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+
+  function setupFileInput(input) {
+    const zone = input.closest('[data-dropzone]');
+    const host = zone || input.parentElement;
+    const oldPreview = zone && $('img.preview', zone); if (oldPreview) oldPreview.remove();
+    const status = document.createElement('div'); status.className = 'file-status'; status.hidden = true; status.setAttribute('aria-live', 'polite');
+    const previews = document.createElement('div'); previews.className = 'file-previews';
+    host.appendChild(status); host.appendChild(previews);
+    const maxMb = Number(input.dataset.maxMb || 10);
+    const okTypes = (input.accept || 'image/').split(',').map((t) => t.trim());
+
+    const show = () => {
+      previews.innerHTML = '';
+      const files = Array.from(input.files || []);
+      if (zone) zone.classList.remove('has-file', 'has-error');
+      if (!files.length) { status.hidden = true; input.dataset.invalid = ''; return; }
+      const errors = [];
+      files.forEach((f) => {
+        if (!okTypes.some((t) => (t.endsWith('/') ? f.type.startsWith(t) : f.type === t))) errors.push(`${f.name}: ไม่ใช่ไฟล์รูปที่รองรับ (JPG, PNG, WEBP)`);
+        else if (f.size > maxMb * 1048576) errors.push(`${f.name}: ขนาด ${fmtSize(f.size)} เกินกำหนด ${maxMb} MB`);
+      });
+      input.dataset.invalid = errors.length ? '1' : '';
+      status.hidden = false;
+      if (errors.length) {
+        status.className = 'file-status bad';
+        status.innerHTML = '✕ แนบไฟล์ไม่สำเร็จ<ul>' + errors.map((m) => `<li>${m.replace(/</g, '&lt;')}</li>`).join('') + '</ul>';
+        if (zone) zone.classList.add('has-error');
+        return;
+      }
+      status.className = 'file-status ok';
+      const total = files.reduce((a, f) => a + f.size, 0);
+      status.innerHTML = files.length === 1
+        ? `✓ แนบรูปแล้ว: <strong>${files[0].name.replace(/</g, '&lt;')}</strong> (${fmtSize(files[0].size)})${zone ? ' · แตะอีกครั้งเพื่อเปลี่ยนรูป' : ''}`
+        : `✓ แนบรูปแล้ว <strong>${files.length} รูป</strong> (รวม ${fmtSize(total)}) · กดบันทึกเพื่ออัปโหลด`;
+      if (zone) zone.classList.add('has-file');
+      files.forEach((f) => { const im = document.createElement('img'); im.alt = f.name; im.src = URL.createObjectURL(f); previews.appendChild(im); });
+    };
+    input.addEventListener('change', show);
+    if (zone) {
+      ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add('dragover'); }));
+      ['dragleave', 'drop'].forEach((ev) => zone.addEventListener(ev, () => zone.classList.remove('dragover')));
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+        const dt = new DataTransfer();
+        Array.from(e.dataTransfer.files).slice(0, input.multiple ? 12 : 1).forEach((f) => dt.items.add(f));
+        input.files = dt.files; show();
+      });
+    }
+  }
 
   async function setupAddress() {
     const sel = (n) => $(`[data-addr=${n}]`);

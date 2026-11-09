@@ -45,7 +45,7 @@
           <% }) %>
         </div>
       <% } %>
-      <label class="dropzone" data-dropzone><input type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple><strong>อัปโหลดรูปภาพ</strong><div class="small muted">เลือกได้หลายไฟล์ · แนะนำอัตราส่วน 3:4</div><img class="preview" alt="" hidden></label>
+      <label class="dropzone" data-dropzone><input type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple data-max-mb="10"><strong>อัปโหลดรูปภาพ</strong><div class="small muted">เลือกได้หลายไฟล์ · แนะนำอัตราส่วน 3:4</div><img class="preview" alt="" hidden></label>
     </div>
   </div>
 
@@ -63,7 +63,7 @@
       <div class="field"><label>ก่อนเริ่มเช่า (ชั่วโมง)</label><input type="number" name="buffer_before_hours" value="<%= p.buffer_before_hours ?? '' %>" min="0" placeholder="ค่าเริ่มต้น <%= defaults.before %>"><div class="hint">ช่วงเวลาเตรียม/แพ็ก/จัดส่ง ที่ชุดต้องไม่ถูกจองซ้อน</div></div>
       <div class="field"><label>หลังกำหนดคืน (ชั่วโมง)</label><input type="number" name="buffer_after_hours" value="<%= p.buffer_after_hours ?? '' %>" min="0" placeholder="ค่าเริ่มต้น <%= defaults.after %>"><div class="hint">ช่วงขนส่งคืน + ตรวจสอบ + ซัก/ทำความสะอาด ก่อนให้ลูกค้ารายถัดไปเช่า</div></div>
     </div>
-    <button class="btn block"><%= p.id ? 'บันทึกการเปลี่ยนแปลง' : 'สร้างสินค้า' %></button>
+    <button class="btn block" data-busy="กำลังบันทึก…"><%= p.id ? 'บันทึกการเปลี่ยนแปลง' : 'สร้างสินค้า' %></button>
     <% if (p.id) { %><button class="btn danger block" form="del-product" style="margin-top:4px">ลบสินค้า</button><% } %>
   </div>
 </form>

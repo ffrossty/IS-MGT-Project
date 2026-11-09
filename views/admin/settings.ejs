@@ -15,7 +15,7 @@
       <div class="form-grid"><%- inp('promptpay_id', 'PromptPay ID', 'เบอร์มือถือ 10 หลัก หรือเลขประจำตัว 13 หลัก — ระบบสร้าง QR พร้อมยอดเงินอัตโนมัติ') %><%- inp('promptpay_name', 'ชื่อบัญชี (แสดงให้ลูกค้า)') %></div>
       <div class="field"><label>หรือ อัปโหลดรูป QR Code ของร้าน</label>
         <% if (s.payment_qr_image) { %><img src="/media/settings/<%= s.payment_qr_image %>" alt="" style="width:140px;border-radius:8px;border:1px solid var(--line);margin-bottom:8px"><label class="checkbox"><input type="checkbox" name="remove_qr" value="1"> ลบรูปนี้</label><% } %>
-        <input type="file" name="payment_qr" accept="image/png,image/jpeg,image/webp"><div class="hint">ใช้เมื่อไม่ได้ตั้งค่า PromptPay ID (QR แบบคงที่ ลูกค้าต้องกรอกยอดเอง)</div></div>
+        <input type="file" name="payment_qr" accept="image/png,image/jpeg,image/webp" data-max-mb="5"><div class="hint">ใช้เมื่อไม่ได้ตั้งค่า PromptPay ID (QR แบบคงที่ ลูกค้าต้องกรอกยอดเอง)</div></div>
     </div>
   </div>
   <div class="stack">

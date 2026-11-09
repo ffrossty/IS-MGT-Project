@@ -27,11 +27,11 @@
       <% if (o.payment_status === 'rejected') { %><div class="flash error">สลิปก่อนหน้าไม่ผ่าน: <%= o.reject_reason %></div><% } %>
       <form method="post" action="/orders/<%= o.code %>/slip?_csrf=<%= csrf %>" enctype="multipart/form-data">
         <label class="dropzone" data-dropzone>
-          <input type="file" name="slip" accept="image/jpeg,image/png,image/webp" required>
+          <input type="file" name="slip" accept="image/jpeg,image/png,image/webp" required data-max-mb="8">
           <div><strong>แตะเพื่อเลือกรูปสลิป</strong><div class="small muted">JPG / PNG ขนาดไม่เกิน 8MB</div></div>
           <img class="preview" alt="" hidden>
         </label>
-        <button class="btn block" style="margin-top:14px">ส่งสลิปและยืนยันคำสั่งจอง</button>
+        <button class="btn block" style="margin-top:14px" data-busy="กำลังอัปโหลดสลิป…">ส่งสลิปและยืนยันคำสั่งจอง</button>
       </form>
       <p class="small muted" style="margin-top:12px">แอดมินจะตรวจสอบสลิปและยอดเงินด้วยตนเอง สถานะจะยังไม่เป็น "ชำระเงินสำเร็จ" จนกว่าแอดมินยืนยัน</p>
       <hr>
