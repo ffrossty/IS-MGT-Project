@@ -48,6 +48,7 @@ const NOTIFICATION_TYPE = {
   slip_rejected: 'ขอสลิปใหม่',
   order_rejected: 'ปฏิเสธคำสั่งจอง',
   order_cancelled: 'ยกเลิกคำสั่งซื้อ',
+  return_reminder: 'เตือนก่อนครบกำหนดคืน',
   admin_slip_uploaded: 'แจ้งแอดมิน: สลิปรอตรวจ',
 };
 

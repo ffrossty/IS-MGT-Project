@@ -459,8 +459,8 @@ router.post('/settings', settingsUpload.single('payment_qr'), (req, res) => {
   const allowed = Object.keys(DEFAULT_SETTINGS).filter((k) => k !== 'payment_qr_image');
   const next = {};
   for (const k of allowed) if (req.body[k] !== undefined) next[k] = String(req.body[k]).trim();
-  for (const k of ['auto_expire_unreviewed', 'notify_admin_new_order', 'notify_admin_slip']) next[k] = req.body[k] ? '1' : '0';
-  for (const k of ['ems_fee', 'payment_hold_minutes', 'slip_reupload_minutes', 'admin_review_hours', 'buffer_before_hours', 'buffer_after_hours', 'pickup_start_hour', 'pickup_end_hour', 'min_advance_hours', 'max_advance_days']) {
+  for (const k of ['auto_expire_unreviewed', 'notify_admin_slip']) next[k] = req.body[k] ? '1' : '0';
+  for (const k of ['ems_fee', 'payment_hold_minutes', 'slip_reupload_minutes', 'return_reminder_hours', 'admin_review_hours', 'buffer_before_hours', 'buffer_after_hours', 'pickup_start_hour', 'pickup_end_hour', 'min_advance_hours', 'max_advance_days']) {
     if (next[k] !== undefined && !/^\d+$/.test(next[k])) throw new O.BookingError(`ค่า ${k} ต้องเป็นตัวเลข`);
   }
   if (Number(next.pickup_start_hour) > 23 || Number(next.pickup_end_hour) > 23 || Number(next.pickup_start_hour) > Number(next.pickup_end_hour)) throw new O.BookingError('ช่วงเวลารับ/คืนชุดไม่ถูกต้อง');

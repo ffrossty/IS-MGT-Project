@@ -33,15 +33,15 @@
         <%- inp('buffer_after_hours', 'เวลาตรวจสอบ/ทำความสะอาดหลังคืน (ชม.)', 'ค่าเริ่มต้นของทุกสินค้า', 'number') %>
         <%- inp('pickup_start_hour', 'เวลารับ/คืนชุดเริ่ม (ชั่วโมง 0-23)', '', 'number') %>
         <%- inp('pickup_end_hour', 'เวลารับ/คืนชุดสิ้นสุด (ชั่วโมง 0-23)', '', 'number') %>
-        <%- inp('min_advance_hours', 'ต้องจองล่วงหน้าอย่างน้อย (ชม.)', '', 'number') %>
+        <%- inp('min_advance_hours', 'ต้องจองล่วงหน้าอย่างน้อย (ชม.)', 'นับจากเวลาที่ลูกค้าสั่งจอง', 'number') %>
         <%- inp('max_advance_days', 'จองล่วงหน้าได้ไม่เกิน (วัน)', '', 'number') %>
       </div>
+      <%- inp('return_reminder_hours', 'แจ้งเตือนลูกค้าทาง LINE ก่อนครบกำหนดคืน (ชม.)', 'ส่ง 1 ครั้งต่อรายการ เฉพาะออเดอร์ที่ยืนยันแล้วและยังไม่คืน · ใส่ 0 = ปิด', 'number') %>
       <%- inp('duration_options', 'ระยะเวลาเช่าที่เปิดให้เลือก (วัน)', 'คั่นด้วย comma เช่น 1,2,3,5,7 — คำนวณเป็นชั่วโมง (1 วัน = 24 ชม.)') %>
     </div>
     <div class="card"><h3>แจ้งเตือนแอดมินทาง LINE</h3>
-      <label class="checkbox"><input type="checkbox" name="notify_admin_new_order" value="1" <%= s.notify_admin_new_order === '1' ? 'checked' : '' %>> เมื่อมีลูกค้าสั่งจองเข้ามา (ออเดอร์ใหม่)</label>
-      <label class="checkbox" style="margin-top:8px"><input type="checkbox" name="notify_admin_slip" value="1" <%= s.notify_admin_slip === '1' ? 'checked' : '' %>> เมื่อลูกค้าอัปโหลดสลิป (รอตรวจสอบ)</label>
-      <p class="hint small muted" style="margin-top:8px">ส่งถึงทุกบัญชีที่เป็น Admin และเข้าสู่ระบบด้วย LINE แล้ว — แอดมินต้องเพิ่ม LINE OA ของร้านเป็นเพื่อนก่อนจึงจะได้รับข้อความ</p>
+      <label class="checkbox"><input type="checkbox" name="notify_admin_slip" value="1" <%= s.notify_admin_slip === '1' ? 'checked' : '' %>> แจ้งเตือนเมื่อลูกค้าแนบสลิปและส่งคำสั่งจอง (รอตรวจสอบ)</label>
+      <p class="hint small muted" style="margin-top:8px">ไม่แจ้งตอนลูกค้ากดสั่งแต่ยังไม่แนบสลิป · ส่งถึงทุกบัญชีที่เป็น Admin และเข้าสู่ระบบด้วย LINE แล้ว — แอดมินต้องเพิ่ม LINE OA ของร้านเป็นเพื่อนก่อนจึงจะได้รับข้อความ</p>
     </div>
     <div class="card"><h3>เงื่อนไขการเช่า (ทั่วไป)</h3><textarea name="rental_terms" rows="6"><%= s.rental_terms %></textarea></div>
     <button class="btn block">บันทึกการตั้งค่า</button>

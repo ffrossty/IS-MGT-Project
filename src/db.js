@@ -208,6 +208,13 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 db.exec(SCHEMA);
 
+// ---- lightweight migrations (add columns introduced after the first release)
+function addColumn(table, col, type) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (!cols.includes(col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+}
+addColumn('order_items', 'return_reminded_at', 'INTEGER');   // return-deadline reminder already sent
+
 const DEFAULT_SETTINGS = {
   shop_name: 'GMD Rental',
   shop_tagline: 'Fashion rental · เช่าชุดออกงาน',
@@ -227,7 +234,8 @@ const DEFAULT_SETTINGS = {
   buffer_after_hours: '48',        // return transit + inspection + cleaning
   pickup_start_hour: '9',          // earliest allowed rental start/return time
   pickup_end_hour: '18',
-  min_advance_hours: '48',         // booking must start at least this far ahead
+  min_advance_hours: '3',          // booking must start at least this far ahead
+  return_reminder_hours: '3',      // LINE the customer this long before the return deadline (0 = off)
   max_advance_days: '180',
   duration_options: '1,2,3,4,5,7',
   rental_terms: 'ลูกค้าต้องส่งคืนชุดภายในวันและเวลาที่กำหนด หากคืนล่าช้ามีค่าปรับตามเงื่อนไขของร้าน\nห้ามซักหรือรีดชุดเอง ร้านเป็นผู้ทำความสะอาด\nกรณีชุดเสียหายหรือสูญหาย ร้านจะประเมินค่าเสียหายตามจริง',
@@ -251,6 +259,12 @@ db.prepare("UPDATE settings SET value = 'GMD Rental' WHERE key = 'shop_name' AND
       }
     })();
   }
+}
+
+// one-time: move the old 48h advance-booking default to 3h (an admin-chosen value other than 48 is kept)
+if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migr_min_adv_3'").get()) {
+  db.prepare("UPDATE settings SET value = '3' WHERE key = 'min_advance_hours' AND value = '48'").run();
+  db.prepare("INSERT INTO settings(key, value) VALUES ('migr_min_adv_3', '1')").run();
 }
 
 const settingsCache = { data: null };

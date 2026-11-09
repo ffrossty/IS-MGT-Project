@@ -152,4 +152,17 @@ function adminSlipUploaded(order) {
   return notifyAdmins(order, 'admin_slip_uploaded', text);
 }
 
-module.exports = { adminSlipUploaded, buildAuthorizeUrl, handleCallback, callbackUrl, bookingConfirmed, shipped, slipRejected, orderRejected, orderCancelled, push };
+function returnReminder(order, items, now = Date.now()) {
+  const st = getSettings();
+  const due = Math.min(...items.map((i) => i.due_at));
+  const mins = Math.max(0, Math.round((due - now) / 60000));
+  const left = mins >= 60 ? `${Math.floor(mins / 60)} ชม.${mins % 60 ? ` ${mins % 60} นาที` : ''}` : `${mins} นาที`;
+  const lines = items.map((i) => `• ${i.product_name} (ไซส์ ${i.size_label}) x${i.qty}\n  คืนภายใน ${T.dt(i.due_at)}`).join('\n');
+  let text = `⏰ ${st.shop_name}: ใกล้ถึงกำหนดคืนชุด (อีกประมาณ ${left})\nหมายเลขคำสั่งซื้อ: ${order.code}\n\n${lines}\n\n`
+    + 'กรุณาส่งคืนชุดภายในเวลาที่กำหนด หากคืนล่าช้าอาจมีค่าปรับตามเงื่อนไขของร้าน\n';
+  if (st.shop_phone) text += `ติดต่อร้าน: ${st.shop_phone}\n`;
+  text += `รายละเอียด: ${config.baseUrl}/orders/${order.code}`;
+  return notify(order, 'return_reminder', text);
+}
+
+module.exports = { returnReminder, adminSlipUploaded, buildAuthorizeUrl, handleCallback, callbackUrl, bookingConfirmed, shipped, slipRejected, orderRejected, orderCancelled, push };

@@ -6,6 +6,7 @@ const backup = require('./backup');
 function start() {
   const tick = async () => {
     try { orders.runExpiryJob(); } catch (e) { console.error('[jobs] expiry', e); }
+    try { await orders.runReturnReminders(); } catch (e) { console.error('[jobs] return reminders', e); }
     try { await sheets.processQueue(); } catch (e) { console.error('[jobs] sheets', e); }
     try {
       if (Date.now() - backup.lastBackupAt() > 24 * 3600 * 1000) {

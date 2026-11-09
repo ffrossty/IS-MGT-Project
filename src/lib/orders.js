@@ -143,6 +143,8 @@ function uploadSlip(order, user, filename, now = Date.now()) {
   Promise.resolve(line.adminSlipUploaded(getOrder(order.id))).catch((e) => console.error('[line] admin alert', e.message));
 }
 
+const SYSTEM = { id: null, role: 'system' };
+
 async function approve(order, admin) {
   db.transaction(() => {
     const o = getOrder(order.id);
@@ -270,7 +272,7 @@ function editItem(order, itemId, admin, { startAt, days, qty }) {
     const avail = A.availableQty(item.sku_id, w.blockStart, w.blockEnd, { sku, excludeItemId: item.id });
     if (avail < qty) throw new BookingError(`สต็อกไม่พอในช่วงเวลาใหม่ (ว่าง ${avail} ชิ้น)`);
     const price = unitPrice(sku, days);
-    db.prepare(`UPDATE order_items SET start_at=?, days=?, due_at=?, block_start=?, block_end=?, qty=?, unit_price=?, line_total=? WHERE id=?`)
+    db.prepare(`UPDATE order_items SET start_at=?, days=?, due_at=?, block_start=?, block_end=?, qty=?, unit_price=?, line_total=?, return_reminded_at=NULL WHERE id=?`)
       .run(w.startAt, days, w.dueAt, w.blockStart, w.blockEnd, qty, price, price * qty, item.id);
     const subtotal = db.prepare('SELECT SUM(line_total) s FROM order_items WHERE order_id = ?').get(o.id).s;
     db.prepare('UPDATE orders SET subtotal = ?, total = ? + shipping_fee, updated_at = ? WHERE id = ?').run(subtotal, subtotal, Date.now(), o.id);
@@ -281,6 +283,31 @@ function editItem(order, itemId, admin, { startAt, days, qty }) {
 }
 
 /** Background job: release expired holds, flag overdue reviews. */
+/**
+ * LINE the customer `return_reminder_hours` before the return deadline (once per item).
+ * Only for confirmed orders that haven't been returned yet and whose deadline hasn't passed.
+ */
+async function runReturnReminders(now = Date.now()) {
+  const hours = settingNum('return_reminder_hours', 3);
+  if (!(hours > 0)) return { sent: 0 };
+  const rows = db.prepare(`SELECT oi.* FROM order_items oi JOIN orders o ON o.id = oi.order_id
+    WHERE o.status = 'confirmed' AND oi.return_reminded_at IS NULL AND oi.due_at > ? AND oi.due_at <= ?
+    ORDER BY oi.order_id, oi.due_at`).all(now, now + hours * 3600000);
+  const byOrder = new Map();
+  for (const r of rows) { if (!byOrder.has(r.order_id)) byOrder.set(r.order_id, []); byOrder.get(r.order_id).push(r); }
+  let sent = 0;
+  for (const [orderId, items] of byOrder) {
+    // mark first so a slow LINE call can't cause a second reminder on the next tick
+    const mark = db.prepare('UPDATE order_items SET return_reminded_at = ? WHERE id = ? AND return_reminded_at IS NULL');
+    db.transaction(() => items.forEach((i) => mark.run(now, i.id)))();
+    const order = getOrder(orderId);
+    const n = await line.returnReminder(order, items, now);
+    orderEvent(orderId, SYSTEM, 'return_reminder', `แจ้งเตือนลูกค้าก่อนครบกำหนดคืนชุด (${items.map((i) => i.product_name).join(', ')})${n && n.status !== 'sent' ? ` — ไม่ได้ส่ง LINE: ${n.error || n.status}` : ''}`);
+    sent++;
+  }
+  return { sent };
+}
+
 function runExpiryJob(now = Date.now()) {
   const expired = db.prepare("SELECT id FROM orders WHERE status = 'awaiting_payment' AND hold_expires_at <= ?").all(now);
   const autoExpire = getSettings().auto_expire_unreviewed === '1';
@@ -304,4 +331,4 @@ function runExpiryJob(now = Date.now()) {
   return { expired: expired.length, overdue: overdue.length };
 }
 
-module.exports = { BookingError, evaluateCart, shippingFee, createOrderFromCart, uploadSlip, approve, reject, requestNewSlip, cancel, markReturned, markCompleted, updateShipping, editItem, runExpiryJob, getOrder, getOrderByCode, getItems };
+module.exports = { BookingError, evaluateCart, shippingFee, createOrderFromCart, uploadSlip, approve, reject, requestNewSlip, cancel, markReturned, markCompleted, updateShipping, editItem, runExpiryJob, runReturnReminders, getOrder, getOrderByCode, getItems };

@@ -49,8 +49,9 @@
 
     // file attach feedback: file name, size, preview, type/size validation
     $$('input[type=file]').forEach(setupFileInput);
-    // multipart forms: show progress state, prevent double submit
-    $$('form[enctype="multipart/form-data"]').forEach((f) => f.addEventListener('submit', (e) => {
+    // forms with a "busy" button: show progress state, prevent double submit
+    $$('form').filter((f) => f.enctype === 'multipart/form-data' || $('button[data-busy]', f)).forEach((f) => f.addEventListener('submit', (e) => {
+      if (e.defaultPrevented) return;
       const bad = $$('input[type=file]', f).some((i) => i.dataset.invalid === '1');
       if (bad) { e.preventDefault(); window.alert('ไฟล์ที่แนบไม่ถูกต้อง กรุณาเลือกใหม่'); return; }
       const b = $('button[data-busy]', f) || e.submitter;

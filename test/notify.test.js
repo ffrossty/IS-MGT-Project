@@ -128,3 +128,42 @@ test('cancelling an already-approved order keeps payment as approved (refund cas
   assert.equal(o.status, 'cancelled');
   assert.equal(o.payment_status, 'approved');
 });
+
+test('bookings may start 3 hours from now (default min advance)', () => {
+  const A = require('../src/lib/availability');
+  const now = T.parseLocal('2026-12-01', '08:00');
+  assert.equal(A.validateRentalRequest(T.parseLocal('2026-12-01', '11:00'), 3, now), null);
+  assert.match(A.validateRentalRequest(T.parseLocal('2026-12-01', '10:00'), 3, now), /3 ชั่วโมง/);
+});
+
+test('return reminder: sent once, 3h before the deadline, only for confirmed orders not yet returned', async () => {
+  const { setSettings } = require('../src/db');
+  const now = Date.now();
+  const dueIn = (o, ms) => db.prepare('UPDATE order_items SET due_at = ?, return_reminded_at = NULL WHERE order_id = ?').run(now + ms, o.id);
+
+  const soon = makeOrder('confirmed'); dueIn(soon.order, 2 * 3600000);          // due in 2h → remind
+  const later = makeOrder('confirmed'); dueIn(later.order, 5 * 3600000);        // due in 5h → not yet
+  const returned = makeOrder('returned'); dueIn(returned.order, 3600000);       // already returned → no
+  const overdue = makeOrder('confirmed'); dueIn(overdue.order, -3600000);       // past deadline → no
+
+  sent.length = 0;
+  await O.runReturnReminders(now);
+  assert.deepEqual(sent.map((m) => m.to), [soon.userLineId]);
+  const text = sent[0].messages[0].text;
+  assert.match(text, /ใกล้ถึงกำหนดคืนชุด \(อีกประมาณ 2 ชม\.\)/);
+  assert.match(text, /Rosé Dress \(ไซส์ M\) x1[\s\S]*คืนภายใน/);
+
+  sent.length = 0;
+  await O.runReturnReminders(now + 60000);
+  assert.equal(sent.length, 0, 'not sent twice');
+
+  await O.runReturnReminders(now + 2.5 * 3600000);  // later order now within 3h
+  assert.deepEqual(sent.map((m) => m.to), [later.userLineId]);
+
+  sent.length = 0;
+  setSettings({ return_reminder_hours: '0' });
+  const off = makeOrder('confirmed'); dueIn(off.order, 3600000);
+  await O.runReturnReminders(now);
+  assert.equal(sent.length, 0, '0 = off');
+  setSettings({ return_reminder_hours: '3' });
+});
