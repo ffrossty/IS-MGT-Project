@@ -150,30 +150,63 @@
 
   /** Catalog cards: first photo at rest; while hovered, cycle through every photo; back to the first on leave. */
   function setupSlides() {
-    const HOVER_INTERVAL = 1300;
+    const INTERVAL = 1300;
+    // Phones have no hover: the card in the middle of the screen plays instead, and a sideways swipe flips photos.
+    const touchMode = window.matchMedia('(hover: none)').matches;
+    const decks = [];
     $$('[data-slides]').forEach((deck) => {
       const imgs = $$('img', deck);
+      if (imgs.length < 2) return;
       const dots = $$('.slide-dots span', deck.parentElement);
       const card = deck.closest('.product-card') || deck;
       let i = 0; let timer = null;
       const show = (k) => {
         imgs[i].classList.remove('is-active'); if (dots[i]) dots[i].classList.remove('on');
-        i = k;
+        i = (k + imgs.length) % imgs.length;
         imgs[i].classList.add('is-active'); if (dots[i]) dots[i].classList.add('on');
       };
+      const tick = () => show(i + 1);
       const start = () => {
-        clearInterval(timer);
-        // preload the others the first time the card is hovered
-        imgs.forEach((im) => { im.loading = 'eager'; });
-        show((i + 1) % imgs.length);
-        timer = setInterval(() => show((i + 1) % imgs.length), HOVER_INTERVAL);
+        if (timer) return;
+        imgs.forEach((im) => { im.loading = 'eager'; }); // preload the rest on first play
+        tick();
+        timer = setInterval(tick, INTERVAL);
       };
       const stop = () => { clearInterval(timer); timer = null; if (i !== 0) show(0); };
-      card.addEventListener('mouseenter', start);
-      card.addEventListener('mouseleave', stop);
-      card.addEventListener('focusin', start);
-      card.addEventListener('focusout', stop);
+      const restart = () => { clearInterval(timer); timer = setInterval(tick, INTERVAL); };
+      decks.push({ card, start, stop });
+
+      if (!touchMode) {
+        card.addEventListener('mouseenter', start);
+        card.addEventListener('mouseleave', stop);
+        card.addEventListener('focusin', start);
+        card.addEventListener('focusout', stop);
+        return;
+      }
+      // swipe left/right on the photo → previous/next (and don't open the product)
+      let x0 = null; let y0 = 0; let swiped = false;
+      deck.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; swiped = false; }, { passive: true });
+      deck.addEventListener('touchend', (e) => {
+        if (x0 === null) return;
+        const dx = e.changedTouches[0].clientX - x0; const dy = e.changedTouches[0].clientY - y0; x0 = null;
+        if (Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+          swiped = true; imgs.forEach((im) => { im.loading = 'eager'; });
+          show(dx < 0 ? i + 1 : i - 1); if (timer) restart();
+        }
+      }, { passive: true });
+      card.addEventListener('click', (e) => { if (swiped) { e.preventDefault(); swiped = false; } });
     });
+
+    if (touchMode && decks.length && 'IntersectionObserver' in window) {
+      // "hover" on phones = the card sitting in the middle band of the screen
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((en) => {
+          const d = decks.find((x) => x.card === en.target);
+          if (d) (en.isIntersecting ? d.start : d.stop)();
+        });
+      }, { rootMargin: '-30% 0px -30% 0px', threshold: 0 });
+      decks.forEach((d) => io.observe(d.card));
+    }
   }
 
   function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
