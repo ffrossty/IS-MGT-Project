@@ -18,6 +18,8 @@
         });
       });
     });
+    // iOS placeholder for empty date inputs
+    $$('.date-wrap input').forEach((i) => { const sync = () => i.toggleAttribute('data-empty', !i.value); i.addEventListener('input', sync); i.addEventListener('change', sync); sync(); });
     // explanations that are open on desktop but folded on phones
     if (window.matchMedia('(min-width: 761px)').matches) $$('details[data-open-wide]').forEach((d) => { d.open = true; });
     // admin sidebar: tap outside to close

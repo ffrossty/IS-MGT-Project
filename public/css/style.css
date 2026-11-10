@@ -667,3 +667,27 @@ details.avail-note[open] summary::after { transform: rotate(225deg); top: .7em; 
 }
 .sidebar-backdrop { display: none; }
 @media (max-width: 999px) { .sidebar.open ~ .sidebar-backdrop { display: block; position: fixed; inset: 0; background: rgba(10,9,8,.45); z-index: 70; } }
+
+/* iOS Safari: native date/time inputs ignore width:100% and have their own height —
+   force them to fit their column and match the other fields */
+input[type=date], input[type=datetime-local], input[type=time] {
+  -webkit-appearance: none; appearance: none;
+  display: block; min-width: 0; max-width: 100%;
+  min-height: 46px; line-height: 1.3; text-align: left;
+}
+input[type=date]::-webkit-date-and-time-value,
+input[type=datetime-local]::-webkit-date-and-time-value,
+input[type=time]::-webkit-date-and-time-value { text-align: left; margin: 0; min-height: 1.3em; }
+input[type=date]::-webkit-calendar-picker-indicator { opacity: .55; }
+select { min-height: 46px; }
+.field, .date-panel > *, .form-grid > *, .cart-line .edit > * { min-width: 0; }
+.date-panel { align-items: start; }
+@media (max-width: 859px) {
+  /* date on its own row; time + duration side by side */
+  .date-panel .field:first-child { grid-column: 1 / -1; }
+}
+@media (min-width: 860px) { .date-panel { align-items: end; } }
+/* iPhone shows an empty date box with no placeholder — add one (iOS only) */
+.date-wrap { position: relative; }
+.date-ph { display: none; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #b3a99c; pointer-events: none; font-size: .95rem; }
+@supports (-webkit-touch-callout: none) { .date-wrap input:invalid + .date-ph, .date-wrap input[data-empty] + .date-ph { display: block; } }

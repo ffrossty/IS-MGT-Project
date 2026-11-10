@@ -8,7 +8,7 @@
   <form id="f" method="get" action="/" class="date-panel" style="margin-top:22px">
     <div class="field">
       <label for="start_date">วันเริ่มเช่า</label>
-      <input type="date" id="start_date" name="start_date" value="<%= rental.date %>" min="<%= T.toInputDate(Date.now()) %>">
+      <div class="date-wrap"><input type="date" id="start_date" name="start_date" value="<%= rental.date %>" min="<%= T.toInputDate(Date.now()) %>"><span class="date-ph" aria-hidden="true">แตะเพื่อเลือกวันที่</span></div>
     </div>
     <div class="field">
       <label for="start_time">เวลา</label>
