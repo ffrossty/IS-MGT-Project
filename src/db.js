@@ -246,6 +246,7 @@ db.prepare("UPDATE orders SET return_method = 'parcel', return_carrier = COALESC
 const DEFAULT_SETTINGS = {
   shop_name: 'GMD Rental',
   shop_tagline: 'Fashion rental · เช่าชุดออกงาน',
+  share_description: 'ร้านเช่าชุดใส่เล่น ชุดออกงาน ราคาถูก มีบริการส่งด่วน ต้นทางจุฬาฯ สามย่าน', // แสดงใต้ลิงก์เวลาแชร์ใน LINE / Facebook
   shop_phone: '',
   shop_line_url: '',
   express_origin: 'กรุงเทพฯ (ระบุเขต/จุดรับในหน้าตั้งค่า)',

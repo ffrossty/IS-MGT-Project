@@ -9,7 +9,7 @@
   </form>
 </div>
 <div class="cal-legend" style="margin-bottom:10px"><span><span class="ev out" style="display:inline">↗ เริ่มเช่า</span></span><span><span class="ev in" style="display:inline">↙ กำหนดคืน</span></span><span><span class="ev blk" style="display:inline">ปิดชั่วคราว</span></span><span><span class="ev hold" style="display:inline">รอยืนยัน/รอชำระ</span></span></div>
-<div class="table-wrap"><div class="month-cal" style="min-width:760px">
+<div class="table-wrap"><div class="month-cal">
   <% ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'].forEach(d => { %><div class="h"><%= d %></div><% }) %>
   <% for (let i = 0; i < days[0].dow; i++) { %><div class="c" style="background:#fcfbf9"></div><% } %>
   <% const today = T.toInputDate(Date.now()); days.forEach(d => { const pending = (s) => ['awaiting_payment','pending_approval'].includes(s); %>

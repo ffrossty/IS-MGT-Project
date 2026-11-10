@@ -38,6 +38,13 @@ app.use(helmet({
 }));
 
 app.use(compression());
+// brand icons at the root paths browsers / LINE look for
+app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'img', 'brand', 'favicon.ico'), { maxAge: '7d' }));
+app.get('/apple-touch-icon.png', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'img', 'brand', 'apple-touch-icon.png'), { maxAge: '7d' }));
+app.get('/site.webmanifest', (req, res) => res.type('application/manifest+json').send(JSON.stringify({
+  name: getSettings().shop_name, short_name: getSettings().shop_name, start_url: '/', display: 'standalone', background_color: '#0e0c0b', theme_color: '#0e0c0b',
+  icons: [{ src: '/static/img/brand/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/static/img/brand/icon-512.png', sizes: '512x512', type: 'image/png' }],
+})));
 app.use('/static/data', express.static(path.join(__dirname, '..', 'public', 'data'), { maxAge: '7d' }));
 app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: config.isProd ? '7d' : 0 }));
 // Product & shop images are public; payment slips are NOT (served via an auth-checked route).

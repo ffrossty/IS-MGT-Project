@@ -1,7 +1,7 @@
 <%- include('head') %>
 <div class="admin">
   <aside class="sidebar" id="sidebar">
-    <a href="/admin" class="brand"><span class="name"><%= settings.shop_name %></span><span class="tag">Admin Dashboard</span></a>
+    <a href="/admin" class="brand brand-logo"><img src="/static/img/brand/logo-champagne.png?v=<%= assetVersion %>" alt="<%= settings.shop_name %>" width="120" height="42"><span class="tag">Admin Dashboard</span></a>
     <nav>
       <% const nav = [
         ['sec','ภาพรวม'], ['/admin','Dashboard'], ['/admin/calendar','ปฏิทินการจอง'],
@@ -22,6 +22,7 @@
       <button class="btn sm secondary" style="color:#d9d3ca;border-color:#3b3732">ออกจากระบบ</button>
     </form>
   </aside>
+  <div class="sidebar-backdrop" aria-hidden="true"></div>
   <div class="admin-main">
     <div class="admin-top">
       <button class="menu-toggle" data-toggle="#sidebar" aria-label="เมนู">☰</button>

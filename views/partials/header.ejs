@@ -1,8 +1,9 @@
 <%- include('head') %>
 <header class="site-header">
   <div class="container bar">
-    <a href="/" class="brand"><span class="name"><%= settings.shop_name %></span><span class="tag"><%= settings.shop_tagline %></span></a>
-    <button class="menu-toggle" data-toggle=".nav" aria-label="เมนู">☰</button>
+    <a href="/" class="brand brand-logo" aria-label="<%= settings.shop_name %> — หน้าแรก"><img src="/static/img/brand/logo-champagne.png?v=<%= assetVersion %>" alt="<%= settings.shop_name %>" width="130" height="45"></a>
+    <% if (user) { %><a href="/cart" class="cart-mini" aria-label="ตะกร้า"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg><% if (cartCount) { %><span class="cart-count"><%= cartCount %></span><% } %></a><% } %>
+    <button class="menu-toggle" data-toggle=".nav" aria-label="เมนู"><span></span><span></span><span></span></button>
     <nav class="nav">
       <a href="/">คอลเลกชัน</a>
       <% if (user) { %>

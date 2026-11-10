@@ -63,7 +63,7 @@
     <% const tierRows = pricing.tiers(p.id ? p : { price_tiers: p.price_tiers, promo_type: null, base_days: 1, base_price: 0 }); %>
     <div class="card">
       <div class="card-title"><h3>ราคาเช่า</h3><button type="button" class="btn sm secondary" data-add-row="#tier-rows">+ เพิ่มแถว</button></div>
-      <table class="table">
+      <table class="table no-stack">
         <thead><tr><th>จำนวนวัน</th><th>ราคา (บาท)</th><th></th></tr></thead>
         <tbody id="tier-rows">
           <% tierRows.forEach(t => { %>

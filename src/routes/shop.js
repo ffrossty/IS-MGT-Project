@@ -131,7 +131,7 @@ router.get('/', (req, res) => {
 
   const due = validRental.startAt ? A.windowFor(null, validRental.startAt, validRental.days) : null;
   res.render('shop/home', {
-    title: 'เช่าชุด', products, measure, sizes: SIZES, rental, rentalError, due, timeOptions: timeOptions(),
+    title: null, products, measure, sizes: SIZES, rental, rentalError, due, timeOptions: timeOptions(),
     durations: A.durationOptions(), qtyNeeded, onlyAvailable, totalBeforeFilter: rows.length, note: availabilityNote(),
   });
 });

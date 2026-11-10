@@ -1,5 +1,5 @@
 'use strict';
-/* Seed sample categories, products, sizes and illustrated placeholder images.
+/* Seed sample products (size + B/W/H/L measurements) and illustrated placeholder images.
    Usage: npm run seed            (only when there are no products yet)
           npm run seed -- --force (add sample products anyway)                */
 const fs = require('fs');
@@ -29,13 +29,6 @@ function svg(shape, c1, c2, fill, accent) {
 <ellipse cx="150" cy="392" rx="120" ry="6" fill="#000" opacity=".06"/></svg>`;
 }
 
-const cats = ['ชุดราตรี', 'ชุดออกงาน', 'ชุดไทย', 'ชุดเพื่อนเจ้าสาว', 'สูท & เซ็ต'];
-const catId = {};
-cats.forEach((c, i) => {
-  db.prepare('INSERT OR IGNORE INTO categories(name, sort) VALUES (?, ?)').run(c, i);
-  catId[c] = db.prepare('SELECT id FROM categories WHERE name = ?').get(c).id;
-});
-
 const chart = 'Size, อก (นิ้ว), เอว (นิ้ว), สะโพก (นิ้ว), ความยาว (นิ้ว)\nXS, 30-31, 24-25, 33-34, 54\nS, 32-33, 26-27, 35-36, 55\nM, 34-35, 28-29, 37-38, 56\nL, 36-37, 30-31, 39-40, 57\nXL, 38-39, 32-33, 41-42, 58';
 const P = [
   { name: 'Celeste Satin Gown', cat: 'ชุดราตรี', price: 2500, extra: 400, shape: 'gown', colors: ['#e9e4ef', '#d9d1e4', '#8f84b8', '#5e5491'], sizes: [['Free size', 1]],
@@ -59,9 +52,17 @@ const P = [
 const now = Date.now();
 db.transaction(() => {
   P.forEach((p, idx) => {
-    const id = db.prepare(`INSERT INTO products(name, category_id, description, conditions, size_chart, base_price, base_days, extra_day_price, is_active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, 3, ?, 1, ?, ?)`).run(p.name, catId[p.cat], p.desc, 'ค่ามัดจำชุด 1,000 บาท คืนเต็มจำนวนเมื่อส่งคืนชุดตามกำหนดและชุดอยู่ในสภาพดี', p.size_chart || chart, p.price, p.extra, now - idx * 60000, now).lastInsertRowid;
-    p.sizes.forEach(([s, q], i) => db.prepare('INSERT INTO skus(product_id, size_label, stock_qty, sort) VALUES (?, ?, ?, ?)').run(id, s, q, i));
+    // one stock line per dress: size from the first sample size (Freesize/XS…XL), measurements per size
+    const SZ = { 'Free size': 'Freesize', XS: 'XS', S: 'S', M: 'M', L: 'L', XL: 'XL' };
+    const MEAS = { Freesize: [32, 35, 25, 28, null, null, 60], XS: [30, 31, 24, 25, 33, 34, 54], S: [32, 33, 26, 27, 35, 36, 55], M: [34, 35, 28, 29, 37, 38, 56], L: [36, 37, 30, 31, 39, 40, 57], XL: [38, 39, 32, 33, 41, 42, 58] };
+    const size = SZ[p.sizes[0][0]] || null; const m = MEAS[size] || MEAS.M;
+    const qty = p.sizes.reduce((t, [, q]) => t + q, 0);
+    const tiers = JSON.stringify([{ days: 1, price: Math.round(p.price * 0.6 / 10) * 10 }, { days: 3, price: p.price }, { days: 5, price: p.price + 2 * p.extra }]);
+    const id = db.prepare(`INSERT INTO products(name, description, conditions, size, bust, bust_max, waist, waist_max, hip, hip_max, hip_free, length,
+        base_price, base_days, extra_day_price, price_tiers, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 1, ?, ?)`).run(p.name, p.desc, 'ค่ามัดจำชุด 1,000 บาท คืนเต็มจำนวนเมื่อส่งคืนชุดตามกำหนดและชุดอยู่ในสภาพดี',
+      size, m[0], m[1], m[2], m[3], m[4], m[5], m[4] == null ? 1 : 0, m[6], Math.round(p.price * 0.6 / 10) * 10, p.extra, tiers, now - idx * 60000, now).lastInsertRowid;
+    db.prepare('INSERT INTO skus(product_id, size_label, stock_qty, sort) VALUES (?, ?, ?, 0)').run(id, size || '', qty);
     const [c1, c2, f, a] = p.colors;
     const variants = [[c1, c2, f, a], [c2, c1, a, f], ['#f1ede7', c1, f, a]];
     variants.forEach((v, i) => {
@@ -72,4 +73,4 @@ db.transaction(() => {
   });
 })();
 setSettings({ express_origin: 'สยามสแควร์ กรุงเทพฯ' });
-console.log(`Seeded ${P.length} sample products in ${cats.length} categories.`);
+console.log(`Seeded ${P.length} sample products.`);

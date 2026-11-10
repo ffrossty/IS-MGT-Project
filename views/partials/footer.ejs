@@ -2,8 +2,9 @@
 <footer class="site-footer">
   <div class="container row between">
     <div>
-      <div class="brand"><span class="name" style="font-size:1.2rem"><%= settings.shop_name %></span></div>
-      <div style="margin-top:8px">© <%= new Date().getFullYear() %> · ชุดทุกตัวผ่านการทำความสะอาดและตรวจสภาพก่อนส่งถึงคุณ</div>
+      <img src="/static/img/brand/logo-champagne.png?v=<%= assetVersion %>" alt="<%= settings.shop_name %>" class="footer-logo" width="120" height="42">
+      <div class="footer-desc"><%= settings.share_description %></div>
+      <div class="small" style="margin-top:6px">© <%= new Date().getFullYear() %> · ชุดทุกตัวผ่านการทำความสะอาดและตรวจสภาพก่อนส่งถึงคุณ</div>
     </div>
     <div class="row">
       <% if (settings.shop_phone) { %><span>โทร <%= settings.shop_phone %></span><% } %>

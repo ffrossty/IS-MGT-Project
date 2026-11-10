@@ -383,7 +383,7 @@ router.get('/inventory', (req, res) => {
   const skus = db.prepare(`SELECT s.*, p.name AS product_name, p.is_active FROM skus s JOIN products p ON p.id = s.product_id
     WHERE s.deleted_at IS NULL AND p.deleted_at IS NULL ORDER BY p.name, s.sort, s.id`).all();
   const rows = skus.map((s) => ({ ...s, st: A.skuStatusNow(s.id), rangeFree: from && to && to > from ? A.availableQty(s.id, from, to, { sku: s }) : null }));
-  res.render('admin/inventory', { title: 'สต็อกสินค้า (SKU)', rows, from: req.query.from || '', to: req.query.to || '' });
+  res.render('admin/inventory', { title: 'สต็อกสินค้า', rows, from: req.query.from || '', to: req.query.to || '' });
 });
 
 router.post('/skus/:id/stock', (req, res) => {

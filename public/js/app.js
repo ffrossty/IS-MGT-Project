@@ -6,6 +6,24 @@
   const baht = (n) => '฿' + Number(n || 0).toLocaleString('th-TH');
 
   document.addEventListener('DOMContentLoaded', () => {
+    // phones: tables turn into stacked cards — give each cell its column name
+    $$('table.table:not(.no-stack)').forEach((t) => {
+      const heads = $$('thead th', t).map((th) => th.textContent.trim());
+      if (!heads.length) return;
+      $$('tbody tr', t).forEach((tr) => {
+        let col = 0;
+        Array.from(tr.children).forEach((td) => {
+          if (heads[col] && !td.hasAttribute('data-label') && td.colSpan === 1) td.setAttribute('data-label', heads[col]);
+          col += td.colSpan || 1;
+        });
+      });
+    });
+    // explanations that are open on desktop but folded on phones
+    if (window.matchMedia('(min-width: 761px)').matches) $$('details[data-open-wide]').forEach((d) => { d.open = true; });
+    // admin sidebar: tap outside to close
+    const backdrop = $('.sidebar-backdrop');
+    if (backdrop) backdrop.addEventListener('click', () => { const sb = $('#sidebar'); if (sb) sb.classList.remove('open'); });
+
     // toggles (mobile menu, admin sidebar)
     $$('[data-toggle]').forEach((b) => b.addEventListener('click', () => { const t = $(b.dataset.toggle); if (t) t.classList.toggle('open'); }));
     $$('[data-autosubmit]').forEach((el) => el.addEventListener('change', () => el.form.submit()));

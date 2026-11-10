@@ -7,7 +7,7 @@
   <% products.forEach(p => { %>
     <tr>
       <td><img class="thumb" src="<%= h.img(p.image) %>" alt=""></td>
-      <td><a class="link" href="/admin/products/<%= p.id %>"><strong><%= p.name %></strong></a><div class="small muted">ID <%= p.id %> · อัปเดต <%= T.date(p.updated_at) %></div></td>
+      <td class="stack-main"><a class="link" href="/admin/products/<%= p.id %>"><strong><%= p.name %></strong></a><div class="small muted">ID <%= p.id %> · อัปเดต <%= T.date(p.updated_at) %></div></td>
       <td class="small nowrap"><% if (p.size) { %><span class="badge plain"><%= p.size %></span> <% } %><%= h.measures(p) || (p.size ? '' : '-') %></td>
       <td class="small"><% pricing.tiers(p).forEach(t => { %><div class="nowrap"><%= t.days %> วัน <%= baht(t.price) %></div><% }) %>
         <% const pd = pricing.priceDetail(p, pricing.tiers(p)[0].days); if (pd.promo) { %><span class="promo-tag" style="margin:2px 0 0">โปร -<%= pd.percentOff %>%</span><% } %></td>

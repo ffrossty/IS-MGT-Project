@@ -4,6 +4,7 @@
   <div class="stack">
     <div class="card"><h3>ข้อมูลร้าน</h3>
       <%- inp('shop_name', 'ชื่อร้าน') %><%- inp('shop_tagline', 'คำโปรย') %>
+      <div class="field"><label>คำอธิบายเวลาแชร์ลิงก์ (LINE / Facebook)</label><textarea name="share_description" rows="2" maxlength="200" style="min-height:64px"><%= s.share_description %></textarea><div class="hint">แสดงใต้ชื่อร้านพร้อมโลโก้ เมื่อแปะลิงก์หน้าร้านในแชต · LINE อาจจำตัวอย่างเก่าไว้สักพักก่อนอัปเดต</div></div>
       <div class="form-grid"><%- inp('shop_phone', 'เบอร์โทรร้าน') %><%- inp('shop_line_url', 'ลิงก์ LINE OA', 'เช่น https://lin.ee/xxxx') %></div>
       <%- inp('google_sheet_url', 'ลิงก์ Google Sheets (ไม่บังคับ)', 'เว้นว่างเพื่อใช้ลิงก์จาก GOOGLE_SHEETS_SPREADSHEET_ID อัตโนมัติ') %>
     </div>
