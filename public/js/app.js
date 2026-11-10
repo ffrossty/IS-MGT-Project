@@ -151,7 +151,8 @@
   /** Catalog cards: first photo at rest; while hovered, cycle through every photo; back to the first on leave. */
   function setupSlides() {
     const INTERVAL = 1300;
-    // Phones have no hover: the card in the middle of the screen plays instead, and a sideways swipe flips photos.
+    // Phones have no hover: a card starts playing the moment a finger touches it (tap, hold or while scrolling),
+    // keeps playing after release, and goes back to its main photo when another card is touched or it leaves the screen.
     const touchMode = window.matchMedia('(hover: none)').matches;
     const decks = [];
     $$('[data-slides]').forEach((deck) => {
@@ -166,8 +167,10 @@
         imgs[i].classList.add('is-active'); if (dots[i]) dots[i].classList.add('on');
       };
       const tick = () => show(i + 1);
+      let startedAt = 0;
       const start = () => {
         if (timer) return;
+        startedAt = Date.now();
         imgs.forEach((im) => { im.loading = 'eager'; }); // preload the rest on first play
         tick();
         timer = setInterval(tick, INTERVAL);
@@ -183,6 +186,8 @@
         card.addEventListener('focusout', stop);
         return;
       }
+      // touching the card (any part) → this card plays, the previously playing one resets
+      card.addEventListener('touchstart', () => activate(decks.find((d) => d.card === card)), { passive: true });
       // swipe left/right on the photo → previous/next (and don't open the product)
       let x0 = null; let y0 = 0; let swiped = false;
       deck.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; swiped = false; }, { passive: true });
@@ -191,20 +196,27 @@
         const dx = e.changedTouches[0].clientX - x0; const dy = e.changedTouches[0].clientY - y0; x0 = null;
         if (Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(dy) * 1.3) {
           swiped = true; imgs.forEach((im) => { im.loading = 'eager'; });
-          show(dx < 0 ? i + 1 : i - 1); if (timer) restart();
+          // the touch that started this swipe already advanced one photo — don't count it twice
+          const fresh = Date.now() - startedAt < 700;
+          show(dx < 0 ? (fresh ? i : i + 1) : (fresh ? i - 2 : i - 1)); if (timer) restart();
         }
       }, { passive: true });
       card.addEventListener('click', (e) => { if (swiped) { e.preventDefault(); swiped = false; } });
     });
 
+    let active = null;
+    function activate(d) {
+      if (!d || active === d) return;
+      if (active) active.stop();
+      active = d; d.start();
+    }
     if (touchMode && decks.length && 'IntersectionObserver' in window) {
-      // "hover" on phones = the card sitting in the middle band of the screen
+      // the playing card returns to its main photo once it has scrolled completely off screen
       const io = new IntersectionObserver((entries) => {
         entries.forEach((en) => {
-          const d = decks.find((x) => x.card === en.target);
-          if (d) (en.isIntersecting ? d.start : d.stop)();
+          if (!en.isIntersecting && active && active.card === en.target) { active.stop(); active = null; }
         });
-      }, { rootMargin: '-30% 0px -30% 0px', threshold: 0 });
+      }, { threshold: 0 });
       decks.forEach((d) => io.observe(d.card));
     }
   }

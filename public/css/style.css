@@ -691,3 +691,6 @@ select { min-height: 46px; }
 .date-wrap { position: relative; }
 .date-ph { display: none; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #b3a99c; pointer-events: none; font-size: .95rem; }
 @supports (-webkit-touch-callout: none) { .date-wrap input:invalid + .date-ph, .date-wrap input[data-empty] + .date-ph { display: block; } }
+/* phones: no "save image / link preview" pop-up when a finger rests on a product card */
+.product-card, .product-card img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.product-card img { -webkit-user-drag: none; }
