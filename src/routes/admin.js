@@ -590,7 +590,8 @@ router.get('/system', (req, res) => {
   const syncStats = db.prepare('SELECT status, COUNT(*) n, SUM(dirty) d FROM sheet_sync GROUP BY status').all();
   const syncErrors = db.prepare("SELECT s.*, o.code FROM sheet_sync s JOIN orders o ON o.id = s.order_id WHERE s.status = 'failed' ORDER BY s.order_id DESC LIMIT 10").all();
   res.render('admin/system', {
-    title: 'ระบบ & การเชื่อมต่อ', notifications, syncStats, syncErrors, backups: backup.list(),
+    title: 'ระบบ & การเชื่อมต่อ', notifications, syncStats, syncErrors, backups: backup.list(), resetPhrase: RESET_PHRASE,
+    orderCount: db.prepare('SELECT COUNT(*) n FROM orders').get().n,
     status: {
       lineLogin: config.lineLoginConfigured, lineMessaging: config.lineMessagingConfigured, sheets: config.sheetsConfigured,
       callback: line.callbackUrl(), baseUrl: config.baseUrl, devLogin: config.devLogin, serviceEmail: config.sheets.serviceEmail,
@@ -614,6 +615,30 @@ router.post('/system/backup', wrap(async (req, res) => {
   audit(req, 'backup', 'database', b.name);
   res.flash('success', `สำรองข้อมูลแล้ว: ${b.name}`);
   res.redirect('/admin/system');
+}));
+// Danger zone: wipe every order (e.g. test orders before going live). Products, customers and settings stay.
+const RESET_PHRASE = 'ลบออเดอร์ทั้งหมด';
+router.post('/system/reset-orders', wrap(async (req, res) => {
+  if (String(req.body.confirm || '').trim() !== RESET_PHRASE) {
+    res.flash('error', `พิมพ์คำว่า “${RESET_PHRASE}” ให้ตรงก่อนกดยืนยัน — ยังไม่ได้ลบอะไร`);
+    return res.redirect('/admin/system#reset');
+  }
+  const b = await backup.runBackup('before-reset');   // safety net: the full database as it was
+  const slips = db.prepare('SELECT slip_filename f FROM orders WHERE slip_filename IS NOT NULL').all().map((r) => r.f);
+  const n = db.transaction(() => {
+    const count = db.prepare('SELECT COUNT(*) n FROM orders').get().n;
+    db.prepare('DELETE FROM notifications WHERE order_id IS NOT NULL').run();
+    db.prepare('DELETE FROM sheet_sync').run();
+    db.prepare('DELETE FROM order_events').run();
+    db.prepare('DELETE FROM order_items').run();
+    db.prepare('DELETE FROM orders').run();
+    if (req.body.carts) db.prepare('DELETE FROM cart_items').run();
+    return count;
+  })();
+  slips.forEach((f) => removeFile('slips', f));
+  audit(req, 'reset_orders', 'database', null, undefined, { orders: n, backup: b.name, carts: !!req.body.carts });
+  res.flash('success', `ลบคำสั่งซื้อทั้งหมด ${n} รายการแล้ว — สต็อกทุกชุดกลับมาว่าง · สำรองข้อมูลก่อนลบไว้ที่ ${b.name}`);
+  res.redirect('/admin/system#reset');
 }));
 router.get('/system/backups/:name', (req, res) => {
   const name = path.basename(req.params.name);

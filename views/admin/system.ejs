@@ -62,5 +62,20 @@
       <form method="post" action="/admin/system/run-jobs"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm secondary">รันตอนนี้</button></form>
     </div>
   </div>
+  <div class="card danger-zone" id="reset" style="margin-top:18px">
+    <h3>ล้างคำสั่งซื้อทั้งหมด (เริ่มใหม่)</h3>
+    <p class="small">ใช้ลบคำสั่งซื้อทดสอบก่อนเปิดร้านจริง — ตอนนี้มี <strong><%= orderCount %></strong> คำสั่งซื้อ</p>
+    <ul class="small" style="margin:6px 0 10px;padding-left:18px">
+      <li><strong>ลบ:</strong> คำสั่งซื้อทุกสถานะ รายการเช่า ประวัติสถานะ สลิปที่อัปโหลด และคิวซิงก์ Google Sheets — สต็อกทุกชุดจะกลับมาว่าง</li>
+      <li><strong>ไม่ลบ:</strong> สินค้า รูป ไซส์ สต็อก การปิดชุดชั่วคราวในปฏิทิน บัญชีลูกค้า/แอดมิน การตั้งค่าร้าน และประวัติการใช้งาน (Audit)</li>
+      <li>ระบบจะ <strong>สำรองข้อมูลอัตโนมัติก่อนลบ</strong> (ดาวน์โหลดได้ในกล่องสำรองข้อมูลด้านบน) · แถวใน Google Sheets ที่ซิงก์ไปแล้วต้องลบในชีตเอง</li>
+    </ul>
+    <form method="post" action="/admin/system/reset-orders" class="row" style="gap:10px;align-items:flex-end;flex-wrap:wrap" data-confirm="ยืนยันลบคำสั่งซื้อทั้งหมด <%= orderCount %> รายการ? (ระบบจะสำรองข้อมูลไว้ก่อน)">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="field" style="margin:0;flex:1 1 260px"><label>พิมพ์ <strong>“<%= resetPhrase %>”</strong> เพื่อยืนยัน</label><input type="text" name="confirm" autocomplete="off" placeholder="<%= resetPhrase %>"></div>
+      <label class="checkbox small" style="margin:0 0 12px"><input type="checkbox" name="carts" value="1" checked> ล้างตะกร้าของทุกคนด้วย</label>
+      <button class="btn danger" style="margin-bottom:2px">ลบคำสั่งซื้อทั้งหมด</button>
+    </form>
+  </div>
 </div>
 <%- include('../partials/admin-footer') %>

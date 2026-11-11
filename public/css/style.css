@@ -739,3 +739,5 @@ select { min-height: 46px; }
   .fit-measures summary .dash { display: none; }
   .fit-grid .mf-label span { font-size: .74rem; }
 }
+.danger-zone { border-color: #e9c3bd; background: #fffaf9; }
+.danger-zone h3 { color: var(--bad); }

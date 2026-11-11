@@ -107,3 +107,21 @@ test('single-size form (no var_keys) still works', async () => {
   assert.deepEqual(skusOf(pid).map((x) => [x.size_label, x.stock_qty, x.waist]), [['L', 3, 28]]);
   assert.equal(db.prepare('SELECT size FROM products WHERE id = ?').get(pid).size, 'L');
 });
+
+test('admin can wipe all orders (needs exact phrase); products, users and settings stay', async () => {
+  const admin = new Client(); await admin.login('Boss', 'admin');
+  const before = { products: db.prepare('SELECT COUNT(*) n FROM products').get().n, skus: db.prepare('SELECT COUNT(*) n FROM skus').get().n, users: db.prepare('SELECT COUNT(*) n FROM users').get().n };
+  assert.ok(db.prepare('SELECT COUNT(*) n FROM orders').get().n > 0);
+  await admin.post('/admin/system/reset-orders', { confirm: 'ลบ' }, '/admin/system');
+  assert.ok(db.prepare('SELECT COUNT(*) n FROM orders').get().n > 0, 'wrong phrase deletes nothing');
+  const r = await admin.post('/admin/system/reset-orders', { confirm: 'ลบออเดอร์ทั้งหมด', carts: '1' }, '/admin/system');
+  assert.equal(r.status, 302);
+  for (const t of ['orders', 'order_items', 'order_events', 'sheet_sync', 'cart_items']) assert.equal(db.prepare(`SELECT COUNT(*) n FROM ${t}`).get().n, 0, t);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM products').get().n, before.products);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM skus').get().n, before.skus);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM users').get().n, before.users);
+  assert.ok(db.prepare("SELECT 1 FROM audit_logs WHERE action = 'reset_orders'").get());
+  const customer = new Client(); await customer.login('Cus', 'customer');
+  const denied = await customer.post('/admin/system/reset-orders', { confirm: 'ลบออเดอร์ทั้งหมด' }, '/account');
+  assert.notEqual(denied.status, 200);
+});
