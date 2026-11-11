@@ -65,7 +65,7 @@ const NOTIFICATION_TYPE = {
 };
 
 /** ไซส์ที่เลือกได้ (ไม่บังคับ) */
-const SIZES = ['Freesize', 'XS', 'S', 'M', 'L', 'XL'];
+const SIZES = ['Freesize', 'XS', 'S', 'SM', 'M', 'ML', 'L', 'XL'];
 /** สัดส่วนชุด */
 const MEASURES = [
   { key: 'b', col: 'bust', ab: 'B', label: 'Bust', th: 'อก' },
