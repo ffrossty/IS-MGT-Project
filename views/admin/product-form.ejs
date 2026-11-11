@@ -10,35 +10,14 @@
     </div>
 
     <div class="card">
-      <h3>ไซส์ & สัดส่วนชุด</h3>
-      <div class="field" style="max-width:220px"><label for="p_size">ไซส์</label>
-        <select id="p_size" name="size">
-          <option value="">— ไม่ระบุไซส์ —</option>
-          <% L.SIZES.forEach(sz => { %><option value="<%= sz %>" <%= p.size === sz ? 'selected' : '' %>><%= sz %></option><% }) %>
-        </select>
-        <div class="hint">ไม่บังคับ — ชุดที่มีแค่สัดส่วน B W H L ให้เลือก “ไม่ระบุไซส์”</div></div>
-      <label style="margin-top:14px">สัดส่วน <span class="muted small" style="font-weight:400">(นิ้ว)</span></label>
-      <div class="measure-grid">
-        <% L.MEASURES.forEach(m => { const free = !!p[m.col + '_free']; %>
-          <div class="field mfield" data-fs-wrap>
-            <label for="m_<%= m.col %>" class="nowrap"><strong><%= m.ab %></strong> <span class="muted small"><%= m.th %></span></label>
-            <div class="mf-range">
-              <input type="number" id="m_<%= m.col %>" name="<%= m.col %>" value="<%= free ? '' : (p[m.col] ?? '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="<%= {bust:32,waist:26,hip:35,length:40}[m.col] %>" aria-label="<%= m.label %> ตั้งแต่">
-              <span class="mf-to">–</span>
-              <input type="number" name="<%= m.col %>_max" value="<%= free ? '' : (p[m.col + '_max'] ?? '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="ถึง" aria-label="<%= m.label %> ถึง (ไม่บังคับ)">
-            </div>
-            <label class="fs-toggle"><input type="checkbox" name="<%= m.col %>_free" value="1" data-fs <%= free ? 'checked' : '' %>><span>Freesize</span></label>
-          </div>
-        <% }) %>
+      <div class="card-title"><h3>ไซส์ & สัดส่วนชุด</h3><button type="button" class="btn sm secondary" data-var-add>+ เพิ่มไซส์</button></div>
+      <p class="small muted" style="margin-top:-4px">ชุดแบบเดียวที่มีหลายไซส์ ให้เพิ่มเป็นหลายแถวในสินค้านี้ (ใช้รูปและราคาเดียวกัน) · แต่ละไซส์มีสัดส่วนและจำนวนชุดของตัวเอง · สัดส่วนเป็นนิ้ว: ค่าเดียว (เช่น 34) ช่วง (32 – 36) หรือติ๊ก <strong>Freesize</strong></p>
+      <input type="hidden" name="var_keys" value="<%= skus.length ? skus.map(s => 'e' + s.id).join(',') : 'n0' %>" data-var-keys>
+      <div class="variants" data-variants>
+        <% if (skus.length) { skus.forEach(s => { %><%- include('_variant', { v: s, k: 'e' + s.id }) %><% }) } else { %><%- include('_variant', { v: {}, k: 'n0' }) %><% } %>
       </div>
-      <p class="hint small muted">ใส่ตัวเลขเป็นนิ้ว — ค่าเดียว (ใส่แค่ช่องแรก เช่น 34) หรือเป็นช่วง (เช่น 32 – 36 สำหรับผ้ายืด/ปรับได้) หรือติ๊ก <strong>Freesize</strong> ถ้าสัดส่วนนั้นใส่ได้ทุกขนาด (เช่น สะโพกบาน) ไม่ต้องใส่ตัวเลข · ช่องที่เว้นว่าง ชุดนี้จะไม่ขึ้นเมื่อลูกค้ากรองด้วยสัดส่วนนั้น</p>
-      <% const extraSkus = skus.slice(1); %>
-      <div class="field" style="margin-top:14px;max-width:220px"><label class="req">จำนวนชุดที่มี (สต็อก)</label>
-        <input type="number" name="stock_qty" value="<%= skus.length ? skus[0].stock_qty : 1 %>" min="0" required></div>
-      <p class="small muted">ระบบคำนวณจำนวนว่างตามช่วงเวลาจากการจองอัตโนมัติ · ปิดชุดชั่วคราว (ซ่อม/ซัก) ได้ที่หน้า <strong>ปฏิทิน</strong></p>
-      <% if (extraSkus.length) { %>
-        <div class="flash warn small" style="margin-top:10px">สินค้านี้มีสต็อกแยกหลายไซส์จากระบบเดิม (<%= skus.map(s => s.size_label + ':' + s.stock_qty).join(', ') %>) — เมื่อกดบันทึก ระบบจะรวมเป็นชุดเดียวตามจำนวนสต็อกด้านบน (ไซส์ที่ยังมีการจองค้างอยู่จะคงไว้จนการจองเสร็จสิ้น)</div>
-      <% } %>
+      <template data-var-template><%- include('_variant', { v: {}, k: '__K__' }) %></template>
+      <p class="small muted" style="margin-top:12px">ระบบคำนวณจำนวนว่างตามช่วงเวลาจากการจองอัตโนมัติ (แยกตามไซส์) · ปิดชุดชั่วคราว (ซ่อม/ซัก) ได้ที่หน้า <strong>ปฏิทิน</strong> · ไซส์ที่ยังมีการจองค้างอยู่ลบไม่ได้ (ตั้งจำนวนเป็น 0 แทน)</p>
     </div>
 
     <div class="card" id="images">

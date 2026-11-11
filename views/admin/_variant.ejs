@@ -1,0 +1,28 @@
+<%# one size row of a product — v = sku (or {}), k = form key %>
+<div class="variant" data-var-key="<%= k %>">
+  <input type="hidden" name="var_<%= k %>_id" value="<%= v.id || '' %>">
+  <input type="hidden" name="var_<%= k %>_remove" value="" data-var-remove>
+  <div class="variant-head">
+    <div class="field"><label>ไซส์</label>
+      <select name="var_<%= k %>_size" data-var-size>
+        <option value="">— ไม่ระบุไซส์ —</option>
+        <% L.SIZES.forEach(sz => { %><option value="<%= sz %>" <%= v.size_label === sz ? 'selected' : '' %>><%= sz %></option><% }) %>
+      </select></div>
+    <div class="field"><label class="req">จำนวนชุด</label>
+      <input type="number" name="var_<%= k %>_stock" value="<%= v.stock_qty ?? 1 %>" min="0" required></div>
+    <button type="button" class="btn sm ghost variant-del" data-var-del title="ลบไซส์นี้" aria-label="ลบไซส์นี้">ลบ</button>
+  </div>
+  <div class="measure-grid">
+    <% L.MEASURES.forEach(m => { const free = !!v[m.col + '_free']; %>
+      <div class="field mfield" data-fs-wrap>
+        <label class="nowrap"><strong><%= m.ab %></strong> <span class="muted small"><%= m.th %></span></label>
+        <div class="mf-range">
+          <input type="number" name="var_<%= k %>_<%= m.col %>" value="<%= free ? '' : (v[m.col] ?? '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="<%= {bust:32,waist:26,hip:35,length:40}[m.col] %>" aria-label="<%= m.label %> ตั้งแต่">
+          <span class="mf-to">–</span>
+          <input type="number" name="var_<%= k %>_<%= m.col %>_max" value="<%= free ? '' : (v[m.col + '_max'] ?? '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="ถึง" aria-label="<%= m.label %> ถึง (ไม่บังคับ)">
+        </div>
+        <label class="fs-toggle"><input type="checkbox" name="var_<%= k %>_<%= m.col %>_free" value="1" data-fs <%= free ? 'checked' : '' %>><span>Freesize</span></label>
+      </div>
+    <% }) %>
+  </div>
+</div>

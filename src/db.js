@@ -241,6 +241,12 @@ addColumn('products', 'waist_free', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('products', 'hip_free', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('products', 'length_free', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('products', 'size', 'TEXT');                             // Freesize | XS | S | M | L | XL | NULL (ไม่ระบุ)     // price before promotion (for records)
+// หลายไซส์ต่อ 1 สินค้า: แต่ละ SKU (= 1 ไซส์) มีสัดส่วน B/W/H/L ของตัวเอง
+for (const c of ['bust', 'waist', 'hip', 'length']) {
+  addColumn('skus', c, 'REAL');
+  addColumn('skus', `${c}_max`, 'REAL');
+  addColumn('skus', `${c}_free`, 'INTEGER NOT NULL DEFAULT 0');
+}
 db.prepare("UPDATE orders SET return_method = 'parcel', return_carrier = COALESCE(return_carrier, 'ไปรษณีย์ไทย EMS') WHERE return_method = 'ems'").run();
 
 const DEFAULT_SETTINGS = {
@@ -321,6 +327,16 @@ if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migr_size_v2'").get()) {
     }
     db.prepare("INSERT INTO settings(key, value) VALUES ('migr_size_v2', '1')").run();
   })();
+}
+// ย้ายสัดส่วนจากระดับสินค้าไปไว้ที่แต่ละ SKU (ทำครั้งเดียว ข้อมูลเดิมไม่หาย)
+if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migr_sku_measures'").get()) {
+  db.prepare(`UPDATE skus SET
+      bust = (SELECT bust FROM products p WHERE p.id = skus.product_id), bust_max = (SELECT bust_max FROM products p WHERE p.id = skus.product_id), bust_free = (SELECT bust_free FROM products p WHERE p.id = skus.product_id),
+      waist = (SELECT waist FROM products p WHERE p.id = skus.product_id), waist_max = (SELECT waist_max FROM products p WHERE p.id = skus.product_id), waist_free = (SELECT waist_free FROM products p WHERE p.id = skus.product_id),
+      hip = (SELECT hip FROM products p WHERE p.id = skus.product_id), hip_max = (SELECT hip_max FROM products p WHERE p.id = skus.product_id), hip_free = (SELECT hip_free FROM products p WHERE p.id = skus.product_id),
+      length = (SELECT length FROM products p WHERE p.id = skus.product_id), length_max = (SELECT length_max FROM products p WHERE p.id = skus.product_id), length_free = (SELECT length_free FROM products p WHERE p.id = skus.product_id)
+    WHERE deleted_at IS NULL`).run();
+  db.prepare("INSERT INTO settings(key, value) VALUES ('migr_sku_measures', '1')").run();
 }
 if (!db.prepare("SELECT 1 FROM settings WHERE key = 'migr_min_adv_3'").get()) {
   db.prepare("UPDATE settings SET value = '3' WHERE key = 'min_advance_hours' AND value = '48'").run();

@@ -39,12 +39,13 @@ function rentalFromReq(req) {
  *   unavailable — busy; `nextAt` = estimated earliest start when it can be booked again
  *   out         — no stock at all
  */
-function productCardData(p, rental, qtyNeeded = 1) {
+function productCardData(p, rental, qtyNeeded = 1, onlySkuIds = null) {
   const allSkus = db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id').all(p.id);
-  const skus = allSkus;
+  const skus = onlySkuIds ? allSkus.filter((s) => onlySkuIds.has(s.id)) : allSkus;
   const images = db.prepare('SELECT filename FROM product_images WHERE product_id = ? ORDER BY sort, id LIMIT 8').all(p.id).map((r) => r.filename);
   const totalStock = skus.reduce((a, s) => a + s.stock_qty, 0);
   let sizes = allSkus.map((s) => ({ id: s.id, label: s.size_label, stock: s.stock_qty, available: null }));
+  const variants = allSkus.map((s) => ({ size: s.size_label, sku: s }));
   let availability = 'out'; let nextAt = null;
   if (totalStock > 0) {
     const days = rental.days || A.durationOptions()[0] || 1;
@@ -68,7 +69,7 @@ function productCardData(p, rental, qtyNeeded = 1) {
   // การ์ดในคอลเลกชันแสดงราคาเช่า 1 วันเสมอ (ถ้าสินค้าไม่มีแพ็กเกจ 1 วัน ใช้แพ็กเกจที่สั้นที่สุด)
   const cardDays = tiers(p)[0].days;
   const pd = priceDetail(p, cardDays);
-  return { ...p, image: images[0] || null, images, sizes, totalStock, availability, nextAt, price: pd.price, originalPrice: pd.original, promo: pd.promo, percentOff: pd.percentOff, priceDays: cardDays };
+  return { ...p, image: images[0] || null, images, sizes, variants, totalStock, availability, nextAt, price: pd.price, originalPrice: pd.original, promo: pd.promo, percentOff: pd.percentOff, priceDays: cardDays };
 }
 
 const { MEASURES, SIZES } = L;
@@ -104,15 +105,20 @@ router.get('/', (req, res) => {
   const measure = readMeasureFilter(q);
   //   • Freesize → เฉพาะชุดที่สัดส่วนนั้นเป็น Freesize
   //   • ช่วงตัวเลข → ชุดที่สัดส่วน (ค่าเดียวหรือช่วง) ซ้อนทับกับช่วงที่ลูกค้าใส่ + ชุดที่สัดส่วนนั้นเป็น Freesize
+  // ชุดที่มีหลายไซส์: ต้องมี "ไซส์ใดไซส์หนึ่ง" ที่ตรงทุกเงื่อนไขพร้อมกัน
+  const skuWhere = [];
   for (const m of measure.active) {
-    if (m.free) { where.push(`p.${m.col}_free = 1`); continue; }
+    if (m.free) { skuWhere.push(`s.${m.col}_free = 1`); continue; }
     const cond = [];
-    if (m.min != null) { cond.push(`COALESCE(p.${m.col}_max, p.${m.col}) >= @${m.key}min`); params[`${m.key}min`] = m.min; }
-    if (m.max != null) { cond.push(`p.${m.col} <= @${m.key}max`); params[`${m.key}max`] = m.max; }
-    where.push(`(p.${m.col}_free = 1 OR (${cond.join(' AND ')}))`);
+    if (m.min != null) { cond.push(`COALESCE(s.${m.col}_max, s.${m.col}) >= @${m.key}min`); params[`${m.key}min`] = m.min; }
+    if (m.max != null) { cond.push(`s.${m.col} <= @${m.key}max`); params[`${m.key}max`] = m.max; }
+    skuWhere.push(`(s.${m.col}_free = 1 OR (${cond.join(' AND ')}))`);
   }
-  if (measure.size) { where.push('p.size = @size'); params.size = measure.size; }
+  if (measure.size) { skuWhere.push('s.size_label = @size'); params.size = measure.size; }
+  if (skuWhere.length) where.push(`EXISTS (SELECT 1 FROM skus s WHERE s.product_id = p.id AND s.deleted_at IS NULL AND ${skuWhere.join(' AND ')})`);
   const sort = { price_asc: 'p.base_price ASC', price_desc: 'p.base_price DESC', popular: 'pop DESC' }[q.sort] || 'p.created_at DESC';
+  const skuMatch = skuWhere.length ? db.prepare(`SELECT s.id FROM skus s WHERE s.product_id = ? AND s.deleted_at IS NULL AND ${skuWhere.join(' AND ')}`) : null;
+  const skuParams = Object.fromEntries(Object.entries(params).filter(([k]) => skuWhere.join(' ').includes('@' + k)));
   const rows = db.prepare(`SELECT p.*,
       (SELECT COUNT(*) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = p.id AND o.status IN ('confirmed','returned','completed')) AS pop
     FROM products p WHERE ${where.join(' AND ')} ORDER BY ${sort}`).all(params);
@@ -122,7 +128,8 @@ router.get('/', (req, res) => {
   if (rental.startAt && rental.days) rentalError = A.validateRentalRequest(rental.startAt, rental.days);
   else if (rental.date && !rental.startAt) rentalError = 'วันที่ไม่ถูกต้อง';
   const validRental = rental.startAt && rental.days && !rentalError ? rental : { startAt: null, days: null };
-  let products = rows.map((p) => productCardData(p, validRental, qtyNeeded));
+  // availability badge counts only the sizes that match the filter
+  let products = rows.map((p) => productCardData(p, validRental, qtyNeeded, skuMatch ? new Set(skuMatch.all(skuParams, p.id).map((r) => r.id)) : null));
   // all dresses are listed by default; bookable ones first (stable within each group)
   const rank = { available: 0, held: 1, unavailable: 2, out: 3 };
   products = products.map((p, i) => ({ p, i })).sort((a, b) => rank[a.p.availability] - rank[b.p.availability] || a.i - b.i).map((x) => x.p);

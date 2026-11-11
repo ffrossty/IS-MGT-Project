@@ -32,15 +32,18 @@
         <% priceRows.forEach(r => { %><div class="pt"><span><%= r.days %> วัน</span><strong><%= baht(r.price) %></strong><% if (r.promo) { %><s><%= baht(r.original) %></s><% } %></div><% }) %>
       </div>
 
-      <% const MS = L.MEASURES.map(m => [m.ab, m.label + ' · ' + m.th, h.measureValue(p, m.col)]); const hasMS = MS.some(m => m[2] != null); %>
-      <% if (p.size || hasMS) { %>
+      <% const multi = skus.length > 1; const mainSku = skus.find(x => x.stock_qty > 0) || skus[0];
+         const msOf = (sk) => L.MEASURES.map(m => [m.ab, m.label + ' · ' + m.th, h.measureValue(sk, m.col)]);
+         const anyMS = skus.some(sk => msOf(sk).some(m => m[2] != null)); %>
+      <% if (skus.length && (anyMS || (!multi && mainSku.size_label))) { %>
         <div class="pdp-fit">
-          <% if (p.size) { %><div class="pdp-size"><span>ไซส์</span><strong><%= p.size %></strong></div><% } %>
-          <% if (hasMS) { %>
-            <div class="pdp-measures" aria-label="สัดส่วนชุด (นิ้ว)">
+          <% if (!multi && mainSku.size_label) { %><div class="pdp-size"><span>ไซส์</span><strong><%= mainSku.size_label %></strong></div><% } %>
+          <% if (anyMS) { skus.forEach(sk => { const MS = msOf(sk); %>
+            <div class="pdp-measures" data-measures-for="<%= sk.id %>" aria-label="สัดส่วนชุด<%= sk.size_label ? ' ไซส์ ' + sk.size_label : '' %> (นิ้ว)" <%= sk === mainSku ? '' : 'hidden' %>>
               <% MS.forEach(([ab, lab, v]) => { %><div class="m <%= v === 'Freesize' ? 'free' : '' %>"><span class="ab"><%= ab %></span><strong><%= v == null ? '–' : v %></strong><span class="lab"><%= lab %></span></div><% }) %>
             </div>
-            <div class="small muted" style="margin-top:6px">ตัวเลขเป็นหน่วยนิ้ว</div>
+          <% }) %>
+            <div class="small muted" style="margin-top:6px">ตัวเลขเป็นหน่วยนิ้ว<%= multi ? ' · สัดส่วนเปลี่ยนตามไซส์ที่เลือก' : '' %></div>
           <% } %>
         </div>
       <% } %>
@@ -49,14 +52,13 @@
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <input type="hidden" name="product_id" value="<%= p.id %>">
 
-        <% const legacy = skus.length > 1; const mainSku = skus.find(x => x.stock_qty > 0) || skus[0]; %>
-        <% if (legacy) { %>
+        <% if (multi) { %>
           <div class="field">
             <label>เลือกไซส์</label>
             <div class="size-select">
               <% skus.forEach((s, i) => { %>
                 <input type="radio" name="sku_id" id="sku<%= s.id %>" value="<%= s.id %>" <%= s.stock_qty === 0 ? 'disabled' : '' %> <%= s === mainSku ? 'checked' : '' %>>
-                <label for="sku<%= s.id %>"><%= s.size_label %><small>มี <%= s.stock_qty %> ตัว</small></label>
+                <label for="sku<%= s.id %>"><%= s.size_label || '-' %><small><%= s.stock_qty ? 'มี ' + s.stock_qty + ' ชุด' : 'หมด' %></small></label>
               <% }) %>
             </div>
           </div>

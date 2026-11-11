@@ -18,6 +18,10 @@
         });
       });
     });
+    // product page: measurements follow the chosen size
+    $$('input[name=sku_id][type=radio]').forEach((r) => r.addEventListener('change', () => {
+      $$('[data-measures-for]').forEach((m) => { m.hidden = m.dataset.measuresFor !== r.value; });
+    }));
     // iOS placeholder for empty date inputs
     $$('.date-wrap input').forEach((i) => { const sync = () => i.toggleAttribute('data-empty', !i.value); i.addEventListener('input', sync); i.addEventListener('change', sync); sync(); });
     // explanations that are open on desktop but folded on phones
@@ -43,15 +47,8 @@
       if (tb.children.length > 1) tr.remove(); else $$('input', tr).forEach((i) => { i.value = ''; });
     });
     // "Freesize" toggles next to measurement inputs (admin form + catalog filter): checked → number inputs off
-    $$('[data-fs]').forEach((cb) => {
-      const wrap = cb.closest('[data-fs-wrap]');
-      const inputs = wrap ? $$('input[type=number]', wrap) : [];
-      const sync = () => inputs.forEach((i) => {
-        i.disabled = cb.checked;
-        if (cb.checked) { i.dataset.ph = i.dataset.ph || i.placeholder; i.placeholder = 'Freesize'; i.value = ''; } else if (i.dataset.ph) i.placeholder = i.dataset.ph;
-      });
-      cb.addEventListener('change', sync); sync();
-    });
+    bindFreesize(document);
+    setupVariants();
     $$('[data-close-dialog]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
 
     // product page gallery: arrows, thumbnails, keyboard ← →, swipe
@@ -149,6 +146,54 @@
   });
 
   /** Catalog cards: first photo at rest; while hovered, cycle through every photo; back to the first on leave. */
+  function bindFreesize(root) {
+    $$('[data-fs]', root).forEach((cb) => {
+      if (cb.dataset.fsBound) return; cb.dataset.fsBound = '1';
+      const wrap = cb.closest('[data-fs-wrap]');
+      const inputs = wrap ? $$('input[type=number]', wrap) : [];
+      const sync = () => inputs.forEach((i) => {
+        if (!i.dataset.ph) i.dataset.ph = i.placeholder;
+        i.disabled = cb.checked;
+        if (cb.checked) { i.placeholder = 'Freesize'; i.value = ''; } else i.placeholder = i.dataset.ph;
+      });
+      cb.addEventListener('change', sync); sync();
+    });
+  }
+
+  // admin product form: several sizes per product (add / remove rows)
+  function setupVariants() {
+    const box = $('[data-variants]'); if (!box) return;
+    const keysInput = $('[data-var-keys]'); const tpl = $('[data-var-template]');
+    let n = 1;
+    const rows = () => $$('.variant', box);
+    const visible = () => rows().filter((r) => !r.hidden);
+    const refresh = () => {
+      keysInput.value = rows().map((r) => r.dataset.varKey).join(',');
+      const vis = visible();
+      vis.forEach((r) => { const b = $('[data-var-del]', r); if (b) b.hidden = vis.length < 2; });
+    };
+    box.addEventListener('click', (e) => {
+      const del = e.target.closest('[data-var-del]'); if (!del) return;
+      const row = del.closest('.variant');
+      const id = $('input[name$="_id"]', row).value;
+      if (id) {            // existing size: keep it in the form, flagged for removal
+        $('[data-var-remove]', row).value = '1'; row.hidden = true;
+        $$('input,select', row).forEach((i) => { if (i.required) i.required = false; });
+      } else row.remove();
+      refresh();
+    });
+    const add = $('[data-var-add]');
+    if (add && tpl) add.addEventListener('click', () => {
+      let key; do { key = 'n' + n++; } while ($(`[data-var-key="${key}"]`, box));
+      const html = tpl.innerHTML.replace(/__K__/g, key);
+      box.insertAdjacentHTML('beforeend', html);
+      const row = box.lastElementChild; bindFreesize(row);
+      refresh();
+      const sel = $('[data-var-size]', row); if (sel) sel.focus();
+    });
+    refresh();
+  }
+
   function setupSlides() {
     const INTERVAL = 1300;
     // Phones have no hover: a card starts playing the moment a finger touches it (tap, hold or while scrolling),

@@ -132,6 +132,8 @@ router.get('/products', (req, res) => {
       (SELECT COALESCE(SUM(stock_qty),0) FROM skus WHERE product_id = p.id AND deleted_at IS NULL) AS stock
     FROM products p
     WHERE p.deleted_at IS NULL ${q ? 'AND p.name LIKE @q' : ''} ORDER BY p.created_at DESC`).all(q ? { q } : {});
+  const skuStmt = db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id');
+  products.forEach((p) => { p.skus = skuStmt.all(p.id); });
   res.render('admin/products', { title: 'สินค้า', products });
 });
 
@@ -157,35 +159,90 @@ function measure(v) {
   return Math.round(n * 10) / 10;
 }
 
+/** B/W/H/L for one size, read from form fields `${prefix}bust`, `${prefix}bust_max`, `${prefix}bust_free` … */
+function readMeasures(b, prefix = '') {
+  return Object.fromEntries(L.MEASURES.flatMap((m) => {
+    const free = b[`${prefix}${m.col}_free`] ? 1 : 0;   // Freesize → ไม่ต้องใส่ตัวเลข
+    let lo = free ? null : measure(b[`${prefix}${m.col}`]); let hi = free ? null : measure(b[`${prefix}${m.col}_max`]);
+    if (lo == null && hi != null) { lo = hi; hi = null; }      // ใส่แค่ช่อง "ถึง" = ค่าเดียว
+    if (lo != null && hi != null && hi < lo) [lo, hi] = [hi, lo];
+    if (hi === lo) hi = null;
+    return [[m.col, lo], [`${m.col}_max`, hi], [`${m.col}_free`, free]];
+  }));
+}
+const MEASURE_COLS = L.MEASURES.flatMap((m) => [m.col, `${m.col}_max`, `${m.col}_free`]);
+
 /**
- * One stock line per dress (sizes are no longer used). Keeps the first SKU, sets its stock,
- * and retires any legacy extra sizes that have no unfinished bookings.
+ * Sizes of one product (each size = one SKU with its own B/W/H/L and stock).
+ * Form: var_keys="0,1,n2", var_<k>_id, var_<k>_size, var_<k>_stock, var_<k>_remove, var_<k>_bust … .
+ * Without var_keys (older form / API) a single size is read from size, bust…, stock_qty.
  */
-function saveSingleStock(req, productId, qtyRaw, size) {
-  const label = size || '';
-  const qty = Math.max(0, int(qtyRaw, 1));
-  const skus = db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id').all(productId);
-  if (!skus.length) {
-    const id = db.prepare('INSERT INTO skus(product_id, size_label, stock_qty, sort) VALUES (?, ?, ?, 0)').run(productId, label, qty).lastInsertRowid;
-    audit(req, 'create', 'sku', id, undefined, { stock: qty });
-    return;
+function readVariants(b) {
+  const keys = String(b.var_keys || '').split(',').map((k) => k.trim()).filter((k) => /^[a-z0-9]+$/i.test(k));
+  if (!keys.length) {
+    return { legacy: true, removed: [], variants: [{ id: null, size: L.SIZES.includes(b.size) ? b.size : '', stock_qty: Math.max(0, int(b.stock_qty, 1)), ...readMeasures(b) }] };
   }
-  const [main, ...extra] = skus;
-  for (const s of extra) {
-    const future = db.prepare(`SELECT COUNT(*) n FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.sku_id = ? AND oi.block_end > ?
-      AND ${A.ACTIVE_ORDER_SQL.replace(/@now/g, '?')}`).get(s.id, Date.now(), Date.now()).n;
-    if (future) continue;
-    db.prepare('UPDATE skus SET deleted_at = ? WHERE id = ?').run(Date.now(), s.id);
-    db.prepare('DELETE FROM cart_items WHERE sku_id = ?').run(s.id);
-    audit(req, 'delete', 'sku', s.id, s);
+  const variants = []; const removed = [];
+  for (const k of keys) {
+    const pre = `var_${k}_`;
+    const id = int(b[`${pre}id`], 0) || null;
+    if (b[`${pre}remove`]) { if (id) removed.push(id); continue; }
+    variants.push({ id, size: L.SIZES.includes(b[`${pre}size`]) ? b[`${pre}size`] : '', stock_qty: Math.max(0, int(b[`${pre}stock`], 1)), ...readMeasures(b, pre) });
   }
-  // after retiring extras so the (product, size) unique index can't clash
-  if (main.stock_qty !== qty || main.size_label !== label) {
-    const clash = db.prepare('SELECT id FROM skus WHERE product_id = ? AND size_label = ? AND deleted_at IS NULL AND id <> ?').get(productId, label, main.id);
-    if (clash) throw new O.BookingError(`ยังมีการจองค้างอยู่ในไซส์ ${label} เดิม — เปลี่ยนไซส์ได้หลังการจองนั้นเสร็จสิ้น`);
-    db.prepare('UPDATE skus SET size_label = ?, stock_qty = ? WHERE id = ?').run(label, qty, main.id);
-    audit(req, 'update_stock', 'sku', main.id, { size: main.size_label, stock: main.stock_qty }, { size: label, stock: qty });
+  if (!variants.length) throw new O.BookingError('ต้องมีอย่างน้อย 1 ไซส์');
+  if (variants.length > 1 && variants.some((v) => !v.size)) throw new O.BookingError('ชุดที่มีหลายไซส์ ต้องเลือกไซส์ให้ทุกแถว');
+  const seen = new Set();
+  for (const v of variants) {
+    if (seen.has(v.size)) throw new O.BookingError(`มีไซส์ ${v.size || '(ไม่ระบุ)'} ซ้ำกัน — 1 ไซส์ใส่ได้แถวเดียว (เพิ่มจำนวนชุดแทน)`);
+    seen.add(v.size);
   }
+  return { legacy: false, removed, variants };
+}
+
+const hasOpenBookings = (skuId) => db.prepare(`SELECT COUNT(*) n FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.sku_id = ? AND oi.block_end > ?
+  AND ${A.ACTIVE_ORDER_SQL.replace(/@now/g, '?')}`).get(skuId, Date.now(), Date.now()).n > 0;
+
+/** Write a product's sizes (SKUs). Run inside a transaction. */
+function saveVariants(req, productId, { legacy, removed, variants }) {
+  const existing = db.prepare('SELECT * FROM skus WHERE product_id = ? AND deleted_at IS NULL ORDER BY sort, id').all(productId);
+  const byId = new Map(existing.map((s) => [s.id, s]));
+  let retire = removed.filter((id) => byId.has(id));
+  if (legacy) {
+    // single-size form: first SKU is the size; extra old sizes retire once their bookings finish
+    if (existing.length) variants[0].id = existing[0].id;
+    retire = existing.slice(1).filter((s) => !hasOpenBookings(s.id)).map((s) => s.id);
+  } else {
+    for (const v of variants) if (v.id && !byId.has(v.id)) v.id = null;   // stale id → treat as new
+    for (const id of retire) {
+      if (hasOpenBookings(id)) throw new O.BookingError(`ลบไซส์ ${byId.get(id).size_label || ''} ไม่ได้ — ยังมีการจองที่ยังไม่เสร็จสิ้น (ตั้งจำนวนเป็น 0 เพื่อหยุดรับจองแทน)`);
+    }
+  }
+  for (const id of retire) {
+    db.prepare('UPDATE skus SET deleted_at = ? WHERE id = ?').run(Date.now(), id);
+    db.prepare('DELETE FROM cart_items WHERE sku_id = ?').run(id);
+    audit(req, 'delete', 'sku', id, byId.get(id));
+  }
+  // free every size label first so swapping sizes between rows can't hit the unique (product, size) index
+  const kept = variants.filter((v) => v.id);
+  kept.forEach((v) => db.prepare('UPDATE skus SET size_label = ? WHERE id = ?').run(`__tmp_${v.id}`, v.id));
+  variants.forEach((v, i) => {
+    const clash = db.prepare('SELECT id FROM skus WHERE product_id = ? AND size_label = ? AND deleted_at IS NULL AND id IS NOT ?').get(productId, v.size, v.id);
+    if (clash) throw new O.BookingError(`ไซส์ ${v.size || '(ไม่ระบุ)'} เดิมยังมีการจองค้างอยู่ — ใช้ไซส์นี้กับแถวใหม่ได้หลังการจองนั้นเสร็จสิ้น`);
+    const vals = { size_label: v.size, stock_qty: v.stock_qty, sort: i, ...Object.fromEntries(MEASURE_COLS.map((c) => [c, v[c]])) };
+    if (v.id) {
+      const before = byId.get(v.id);
+      db.prepare(`UPDATE skus SET ${Object.keys(vals).map((c) => `${c} = @${c}`).join(', ')} WHERE id = @id`).run({ ...vals, id: v.id });
+      if (before.stock_qty !== v.stock_qty || before.size_label !== v.size) audit(req, 'update_stock', 'sku', v.id, { size: before.size_label, stock: before.stock_qty }, { size: v.size, stock: v.stock_qty });
+    } else {
+      const cols = ['product_id', ...Object.keys(vals)];
+      v.id = db.prepare(`INSERT INTO skus(${cols.join(', ')}) VALUES (${cols.map((c) => '@' + c).join(', ')})`).run({ product_id: productId, ...vals }).lastInsertRowid;
+      audit(req, 'create', 'sku', v.id, undefined, { size: v.size, stock: v.stock_qty });
+    }
+  });
+  // product-level size / measurements mirror the first size (used for sorting & older screens)
+  const f = variants[0];
+  db.prepare(`UPDATE products SET size = @size, ${MEASURE_COLS.map((c) => `${c} = @${c}`).join(', ')} WHERE id = @id`)
+    .run({ id: productId, size: f.size || null, ...Object.fromEntries(MEASURE_COLS.map((c) => [c, f[c]])) });
 }
 
 function readProduct(b) {
@@ -209,15 +266,6 @@ function readProduct(b) {
   const p = {
     name: String(b.name || '').trim().slice(0, 150),
     description: String(b.description || '').slice(0, 5000), conditions: String(b.conditions || '').slice(0, 5000),
-    size: L.SIZES.includes(b.size) ? b.size : null,
-    ...Object.fromEntries(L.MEASURES.flatMap((m) => {
-      const free = b[`${m.col}_free`] ? 1 : 0;   // Freesize → ไม่ต้องใส่ตัวเลข
-      let lo = free ? null : measure(b[m.col]); let hi = free ? null : measure(b[`${m.col}_max`]);
-      if (lo == null && hi != null) { lo = hi; hi = null; }      // ใส่แค่ช่อง "ถึง" = ค่าเดียว
-      if (lo != null && hi != null && hi < lo) [lo, hi] = [hi, lo];
-      if (hi === lo) hi = null;
-      return [[m.col, lo], [`${m.col}_max`, hi], [`${m.col}_free`, free]];
-    })),
     price_tiers: JSON.stringify(tiers),
     base_price: tiers[0].price, base_days: tiers[0].days,  // kept in sync for sorting / price filter
     extra_day_price: Math.max(0, int(b.extra_day_price)),
@@ -231,15 +279,16 @@ function readProduct(b) {
 
 router.post('/products', productUpload.array('images', 12), (req, res) => {
   const p = readProduct(req.body);
+  const vars = readVariants(req.body);
   const now = Date.now();
   const id = db.transaction(() => {
-    const info = db.prepare(`INSERT INTO products(name, description, conditions, size, bust, waist, hip, length, bust_max, waist_max, hip_max, length_max, bust_free, waist_free, hip_free, length_free, base_price, base_days, extra_day_price,
+    const info = db.prepare(`INSERT INTO products(name, description, conditions, base_price, base_days, extra_day_price,
       price_tiers, promo_type, promo_value, promo_start, promo_end, promo_label,
-      buffer_before_hours, buffer_after_hours, is_active, created_at, updated_at) VALUES (@name, @description, @conditions, @size, @bust, @waist, @hip, @length, @bust_max, @waist_max, @hip_max, @length_max, @bust_free, @waist_free, @hip_free, @length_free,
+      buffer_before_hours, buffer_after_hours, is_active, created_at, updated_at) VALUES (@name, @description, @conditions,
       @base_price, @base_days, @extra_day_price, @price_tiers, @promo_type, @promo_value, @promo_start, @promo_end, @promo_label,
       @buffer_before_hours, @buffer_after_hours, @is_active, @now, @now)`).run({ ...p, now });
     const pid = info.lastInsertRowid;
-    saveSingleStock(req, pid, req.body.stock_qty, p.size);
+    saveVariants(req, pid, vars);
     verifyImages(req.files).forEach((f, i) => db.prepare('INSERT INTO product_images(product_id, filename, sort) VALUES (?, ?, ?)').run(pid, f.filename, i));
     return pid;
   })();
@@ -252,15 +301,13 @@ router.post('/products/:id', productUpload.array('images', 12), (req, res) => {
   const before = db.prepare('SELECT * FROM products WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
   if (!before) return res.redirect('/admin/products');
   const p = readProduct(req.body);
+  const vars = readVariants(req.body);
   db.transaction(() => {
     db.prepare(`UPDATE products SET name=@name, description=@description, conditions=@conditions,
-      size=@size, bust=@bust, waist=@waist, hip=@hip, length=@length,
-      bust_max=@bust_max, waist_max=@waist_max, hip_max=@hip_max, length_max=@length_max,
-      bust_free=@bust_free, waist_free=@waist_free, hip_free=@hip_free, length_free=@length_free,
       base_price=@base_price, base_days=@base_days, extra_day_price=@extra_day_price, price_tiers=@price_tiers,
       promo_type=@promo_type, promo_value=@promo_value, promo_start=@promo_start, promo_end=@promo_end, promo_label=@promo_label, buffer_before_hours=@buffer_before_hours,
       buffer_after_hours=@buffer_after_hours, is_active=@is_active, updated_at=@now WHERE id=@id`).run({ ...p, now: Date.now(), id: before.id });
-    saveSingleStock(req, before.id, req.body.stock_qty, p.size);
+    saveVariants(req, before.id, vars);
     const max = db.prepare('SELECT COALESCE(MAX(sort), -1) m FROM product_images WHERE product_id = ?').get(before.id).m;
     verifyImages(req.files).forEach((f, i) => db.prepare('INSERT INTO product_images(product_id, filename, sort) VALUES (?, ?, ?)').run(before.id, f.filename, max + 1 + i));
   })();

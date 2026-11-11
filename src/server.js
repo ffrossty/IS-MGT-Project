@@ -23,6 +23,8 @@ app.set('views', path.join(__dirname, '..', 'views'));
 if (config.isProd) app.set('trust proxy', 1);
 
 app.use(helmet({
+  // same-origin referer lets form errors send you back to the page you were on (nothing leaks to other sites)
+  referrerPolicy: { policy: 'same-origin' },
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {

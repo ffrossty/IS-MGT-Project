@@ -62,7 +62,12 @@ db.transaction(() => {
         base_price, base_days, extra_day_price, price_tiers, is_active, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 1, ?, ?)`).run(p.name, p.desc, 'ค่ามัดจำชุด 1,000 บาท คืนเต็มจำนวนเมื่อส่งคืนชุดตามกำหนดและชุดอยู่ในสภาพดี',
       size, m[0], m[1], m[2], m[3], m[4], m[5], m[4] == null ? 1 : 0, m[6], Math.round(p.price * 0.6 / 10) * 10, p.extra, tiers, now - idx * 60000, now).lastInsertRowid;
-    db.prepare('INSERT INTO skus(product_id, size_label, stock_qty, sort) VALUES (?, ?, ?, 0)').run(id, size || '', qty);
+    const addSku = (label, q, mm, sort) => db.prepare(`INSERT INTO skus(product_id, size_label, stock_qty, sort, bust, bust_max, waist, waist_max, hip, hip_max, hip_free, length)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, label, q, sort, mm[0], mm[1], mm[2], mm[3], mm[4], mm[5], mm[4] == null ? 1 : 0, mm[6]);
+    if (p.sizes.length > 1 && size) {
+      // sample dress with several sizes — each size has its own measurements and stock
+      p.sizes.forEach(([lab, q], i) => { const sz = SZ[lab] || lab; addSku(sz, q, MEAS[sz] || MEAS.M, i); });
+    } else addSku(size || '', qty, m, 0);
     const [c1, c2, f, a] = p.colors;
     const variants = [[c1, c2, f, a], [c2, c1, a, f], ['#f1ede7', c1, f, a]];
     variants.forEach((v, i) => {

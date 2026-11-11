@@ -694,3 +694,17 @@ select { min-height: 46px; }
 /* phones: no "save image / link preview" pop-up when a finger rests on a product card */
 .product-card, .product-card img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .product-card img { -webkit-user-drag: none; }
+
+/* admin: sizes of a product */
+.variants { display: grid; gap: 12px; }
+.variant { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: #fcfbf9; }
+.variant[hidden] { display: none; }
+.variant-head { display: grid; grid-template-columns: minmax(0, 180px) minmax(0, 130px) auto; gap: 12px; align-items: end; margin-bottom: 10px; }
+.variant-head .field { margin: 0; }
+.variant-head .variant-del { justify-self: end; color: var(--bad); }
+.variant-head .variant-del[hidden] { display: none; }
+@media (max-width: 640px) { .variant-head { grid-template-columns: 1fr 1fr; } .variant-head .variant-del { grid-column: 1 / -1; justify-self: start; } }
+/* shop: several sizes */
+.size-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: 1px; margin-right: 6px; }
+.pdp-measures[hidden] { display: none; }
+.size-select label small.vm { display: block; font-size: .64rem; color: var(--muted); margin-top: 2px; font-weight: 400; }
