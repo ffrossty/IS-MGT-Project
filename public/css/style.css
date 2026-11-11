@@ -708,3 +708,34 @@ select { min-height: 46px; }
 .size-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: 1px; margin-right: 6px; }
 .pdp-measures[hidden] { display: none; }
 .size-select label small.vm { display: block; font-size: .64rem; color: var(--muted); margin-top: 2px; font-weight: 400; }
+
+/* hero search: name · size · B/W/H/L */
+.fit-panel { background: var(--surface); color: var(--ink); border-radius: 18px; padding: 18px; box-shadow: 0 20px 50px rgba(0,0,0,.35); display: grid; gap: 14px; }
+.fit-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.fit-top .field { margin: 0; }
+.fit-actions { display: flex; gap: 8px; }
+.fit-actions .btn { min-height: 46px; padding-left: 26px; padding-right: 26px; }
+.fit-measures { border-top: 1px solid var(--line-2); padding-top: 12px; }
+.fit-measures summary { cursor: pointer; list-style: none; font-size: .86rem; font-weight: 500; position: relative; padding-right: 22px; }
+.fit-measures summary::-webkit-details-marker { display: none; }
+.fit-measures summary .muted { font-weight: 400; font-size: .8rem; }
+.fit-measures summary::after { content: ''; position: absolute; right: 4px; top: .4em; width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg); transition: transform .2s; }
+.fit-measures[open] summary::after { transform: rotate(225deg); top: .65em; }
+.fit-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 18px; margin-top: 12px; }
+/* sidebar: rental dates */
+.date-side { display: grid; gap: 10px; }
+.date-side .field { margin: 0; }
+.date-side-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.filters-btn { text-align: left; }
+@media (max-width: 979px) { .fit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .fit-panel { padding: 14px; gap: 10px; }
+  .fit-top { grid-template-columns: 1fr 1fr; }
+  .fit-q { grid-column: 1 / -1; }
+  .fit-actions .btn { flex: 1; padding-left: 14px; padding-right: 14px; }
+  .fit-measures summary .muted { display: block; margin-top: 2px; }
+  .fit-grid { gap: 12px; }
+  .fit-grid .mf-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .fit-measures summary .dash { display: none; }
+  .fit-grid .mf-label span { font-size: .74rem; }
+}

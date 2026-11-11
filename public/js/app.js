@@ -22,6 +22,11 @@
     $$('input[name=sku_id][type=radio]').forEach((r) => r.addEventListener('change', () => {
       $$('[data-measures-for]').forEach((m) => { m.hidden = m.dataset.measuresFor !== r.value; });
     }));
+    // GET search forms: leave empty fields out of the URL (keeps links short and shareable)
+    $$('form[data-clean]').forEach((f) => f.addEventListener('submit', () => {
+      $$('input, select', f).forEach((el) => { if (el.name && el.value === '' && el.name !== 'start_date') el.disabled = true; });
+      setTimeout(() => $$('input, select', f).forEach((el) => { if (el.disabled && el.value === '' && !el.closest('[data-fs-wrap]')) el.disabled = false; }), 0);
+    }));
     // iOS placeholder for empty date inputs
     $$('.date-wrap input').forEach((i) => { const sync = () => i.toggleAttribute('data-empty', !i.value); i.addEventListener('input', sync); i.addEventListener('change', sync); sync(); });
     // explanations that are open on desktop but folded on phones

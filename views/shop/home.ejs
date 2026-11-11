@@ -3,40 +3,41 @@
 <div class="container hero">
   <div class="eyebrow">Rental Collection</div>
   <h1>Dress for the <em>moment</em>,<br>not forever.</h1>
-  <p>เลือกวันและเวลาที่ต้องการใช้ชุด ระบบจะแสดงเฉพาะชุดที่ว่างจริงตามสต็อกและตารางการจอง</p>
+  <p>ค้นหาชุดจากชื่อ ไซส์ หรือสัดส่วน B · W · H · L แล้วเลือกวันที่ต้องการใช้ชุดเพื่อดูว่าชุดไหนว่าง</p>
 
-  <form id="f" method="get" action="/" class="date-panel" style="margin-top:22px">
-    <div class="field">
-      <label for="start_date">วันเริ่มเช่า</label>
-      <div class="date-wrap"><input type="date" id="start_date" name="start_date" value="<%= rental.date %>" min="<%= T.toInputDate(Date.now()) %>"><span class="date-ph" aria-hidden="true">แตะเพื่อเลือกวันที่</span></div>
+  <form method="get" action="/" class="fit-panel" style="margin-top:22px" data-clean>
+    <% ['start_date','start_time','days','sort','show'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>"><% } }) %>
+    <div class="fit-top">
+      <div class="field fit-q"><label for="q">ชื่อชุด</label>
+        <input type="search" id="q" name="q" value="<%= query.q || '' %>" placeholder="เช่น เดรสลูกไม้ ชุดไทย"></div>
+      <div class="field fit-size"><label for="size">ไซส์</label>
+        <select id="size" name="size">
+          <option value="">ทุกไซส์</option>
+          <% sizes.forEach(sz => { %><option value="<%= sz %>" <%= measure.size === sz ? 'selected' : '' %>><%= sz %></option><% }) %>
+        </select></div>
+      <div class="fit-actions">
+        <button class="btn" type="submit">ค้นหา</button>
+        <% if (query.q || measure.size || measure.active.length) { %><a class="btn secondary" href="<%= h.qs(query, {q:'',size:'',bmin:'',bmax:'',wmin:'',wmax:'',hmin:'',hmax:'',lmin:'',lmax:'',bfs:'',wfs:'',hfs:'',lfs:''}) %>">ล้าง</a><% } %>
+      </div>
     </div>
-    <div class="field">
-      <label for="start_time">เวลา</label>
-      <select id="start_time" name="start_time">
-        <% timeOptions.forEach(t => { %><option value="<%= t %>" <%= (rental.time || timeOptions[0]) === t ? 'selected' : '' %>><%= t %> น.</option><% }) %>
-      </select>
-    </div>
-    <div class="field">
-      <label for="days">ระยะเวลาเช่า</label>
-      <select id="days" name="days">
-        <option value="">เลือก</option>
-        <% durations.forEach(d => { %><option value="<%= d %>" <%= rental.days === d ? 'selected' : '' %>><%= d %> วัน (<%= d*24 %> ชม.)</option><% }) %>
-      </select>
-    </div>
-    <div class="span-2">
-      <% if (rentalError) { %>
-        <div class="due-note" style="background:var(--bad-soft);color:#8c342b"><%= rentalError %></div>
-      <% } else if (due) { %>
-        <div class="due-note">เริ่ม <strong><%= T.dt(due.startAt) %></strong><br>คืนชุดภายใน <strong><%= T.dt(due.dueAt) %></strong> (<%= due.hours %> ชม.)</div>
-      <% } else { %>
-        <div class="due-note muted">เลือกวัน เวลา และระยะเวลา เพื่อดูชุดที่ว่างและกำหนดคืน</div>
-      <% } %>
-    </div>
-    <div class="span-2" style="display:flex;gap:8px">
-      <button class="btn" type="submit" style="flex:1">ค้นหาชุดที่ว่าง</button>
-      <% if (rental.date) { %><a class="btn secondary" href="/?start_date=">ล้าง</a><% } %>
-    </div>
-    <% ['q','sort','show','size','bmin','bmax','wmin','wmax','hmin','hmax','lmin','lmax','bfs','wfs','hfs','lfs'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>" data-keep="<%= k %>"><% } }) %>
+    <details class="fit-measures" data-open-wide <%= measure.active.length ? 'open' : '' %>>
+      <summary>สัดส่วน (นิ้ว) <span class="muted"><span class="dash">— </span>ใส่เฉพาะช่องที่ต้องการ เช่น อก 32 ถึง 35 · ติ๊ก Freesize ถ้าต้องการชุดที่สัดส่วนนั้นเป็นฟรีไซส์</span></summary>
+      <div class="fit-grid">
+        <% measure.fields.forEach(m => { %>
+          <div class="mf-row" data-fs-wrap>
+            <div class="mf-head">
+              <label class="mf-label" for="f_<%= m.key %>min"><strong><%= m.ab %></strong><span><%= m.label %> · <%= m.th %></span></label>
+              <label class="fs-toggle"><input type="checkbox" name="<%= m.key %>fs" value="1" data-fs <%= m.free ? 'checked' : '' %>><span>Freesize</span></label>
+            </div>
+            <div class="mf-range">
+              <input type="number" id="f_<%= m.key %>min" name="<%= m.key %>min" value="<%= m.free ? '' : (query[m.key + 'min'] || '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="ตั้งแต่">
+              <span class="mf-to">ถึง</span>
+              <input type="number" name="<%= m.key %>max" value="<%= m.free ? '' : (query[m.key + 'max'] || '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="ถึง" aria-label="<%= m.label %> สูงสุด">
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </details>
   </form>
 </div>
 </section>
@@ -57,47 +58,48 @@
 <section class="container">
   <div class="catalog">
     <div class="filters-mobile">
-      <button type="button" class="btn secondary sm filters-btn" data-toggle="#filters" style="margin-bottom:14px">ตัวกรอง ⌄</button>
-      <% const MKEYS = ['size','bmin','bmax','wmin','wmax','hmin','hmax','lmin','lmax','bfs','wfs','hfs','lfs']; const anyFilter = ['q', ...MKEYS].some(k => query[k]); %>
-      <aside class="filters <%= anyFilter ? 'open' : '' %>" id="filters">
-        <h4>ค้นหา</h4>
-        <form method="get" action="/">
-          <% ['sort','show', ...MKEYS].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>"><% } }) %>
-          <input type="search" name="q" value="<%= query.q || '' %>" placeholder="ชื่อชุด">
-        </form>
-        <form method="get" action="/" class="measure-filter">
-          <% ['q','sort','show'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>"><% } }) %>
-          <h4 style="margin-bottom:0">ไซส์</h4>
-          <select name="size" aria-label="ไซส์">
-            <option value="">ทุกไซส์</option>
-            <% sizes.forEach(sz => { %><option value="<%= sz %>" <%= measure.size === sz ? 'selected' : '' %>><%= sz %></option><% }) %>
-          </select>
-          <h4 style="margin-bottom:0">สัดส่วน <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(นิ้ว)</span></h4>
-          <% measure.fields.forEach(m => { %>
-            <div class="mf-row" data-fs-wrap>
-              <div class="mf-head">
-                <label class="mf-label" for="f_<%= m.key %>min"><strong><%= m.ab %></strong><span><%= m.label %> · <%= m.th %></span></label>
-                <label class="fs-toggle"><input type="checkbox" name="<%= m.key %>fs" value="1" data-fs <%= m.free ? 'checked' : '' %>><span>Freesize</span></label>
-              </div>
-              <div class="mf-range">
-                <input type="number" id="f_<%= m.key %>min" name="<%= m.key %>min" value="<%= m.free ? '' : (query[m.key + 'min'] || '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="ตั้งแต่">
-                <span class="mf-to">ถึง</span>
-                <input type="number" name="<%= m.key %>max" value="<%= m.free ? '' : (query[m.key + 'max'] || '') %>" min="0" max="200" step="0.5" inputmode="decimal" placeholder="ถึง" aria-label="<%= m.label %> สูงสุด">
-              </div>
-            </div>
-          <% }) %>
-          <div class="row" style="gap:8px;margin-top:4px">
-            <button class="btn sm" style="flex:1">กรอง</button>
-            <% if (measure.active.length || measure.size) { %><a class="btn sm secondary" href="<%= h.qs(query, {size:'',bmin:'',bmax:'',wmin:'',wmax:'',hmin:'',hmax:'',lmin:'',lmax:'',bfs:'',wfs:'',hfs:'',lfs:''}) %>">ล้าง</a><% } %>
+      <button type="button" class="btn secondary sm filters-btn" data-toggle="#filters" style="margin-bottom:14px"><%= rental.date ? 'วันที่เช่า: ' + T.date(rental.startAt || Date.now()) + (rental.days ? ' · ' + rental.days + ' วัน' : '') : 'เลือกวันที่ต้องการใช้ชุด' %> ⌄</button>
+      <aside class="filters <%= rental.date ? 'open' : '' %>" id="filters">
+        <h4>วันที่ต้องการใช้ชุด</h4>
+        <form id="f" method="get" action="/" class="date-side" data-clean>
+          <% ['q','sort','show', ...['size','bmin','bmax','wmin','wmax','hmin','hmax','lmin','lmax','bfs','wfs','hfs','lfs']].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>" data-keep="<%= k %>"><% } }) %>
+          <div class="field">
+            <label for="start_date">วันเริ่มเช่า</label>
+            <div class="date-wrap"><input type="date" id="start_date" name="start_date" value="<%= rental.date %>" min="<%= T.toInputDate(Date.now()) %>"><span class="date-ph" aria-hidden="true">แตะเพื่อเลือกวันที่</span></div>
           </div>
-          <p class="small muted" style="margin:2px 0 0">ใส่เฉพาะช่องที่ต้องการก็ได้ เช่น อก 32 ถึง 35 · ติ๊ก Freesize เพื่อดูชุดที่สัดส่วนนั้นเป็นฟรีไซส์ (ไม่ต้องใส่ช่วง)</p>
+          <div class="date-side-2">
+            <div class="field">
+              <label for="start_time">เวลา</label>
+              <select id="start_time" name="start_time">
+                <% timeOptions.forEach(t => { %><option value="<%= t %>" <%= (rental.time || timeOptions[0]) === t ? 'selected' : '' %>><%= t %> น.</option><% }) %>
+              </select>
+            </div>
+            <div class="field">
+              <label for="days">ระยะเวลา</label>
+              <select id="days" name="days">
+                <option value="">เลือก</option>
+                <% durations.forEach(d => { %><option value="<%= d %>" <%= rental.days === d ? 'selected' : '' %>><%= d %> วัน</option><% }) %>
+              </select>
+            </div>
+          </div>
+          <% if (rentalError) { %>
+            <div class="due-note" style="background:var(--bad-soft);color:#8c342b"><%= rentalError %></div>
+          <% } else if (due) { %>
+            <div class="due-note">เริ่ม <strong><%= T.dt(due.startAt) %></strong><br>คืนชุดภายใน <strong><%= T.dt(due.dueAt) %></strong> (<%= due.hours %> ชม.)</div>
+          <% } else { %>
+            <div class="due-note muted">เลือกวัน เวลา และระยะเวลา เพื่อดูชุดที่ว่างและกำหนดคืน</div>
+          <% } %>
+          <div class="row" style="gap:8px">
+            <button class="btn sm" type="submit" style="flex:1">ค้นหาชุดที่ว่าง</button>
+            <% if (rental.date) { %><% const clr = h.qs(query, {start_date: '', start_time: '', days: '', show: ''}); %><a class="btn sm secondary" href="<%= clr + (clr === '?' ? '' : '&') %>start_date=">ล้าง</a><% } %>
+          </div>
         </form>
         <h4>การแสดงผล</h4>
         <div class="chips">
           <a class="chip <%= !onlyAvailable ? 'active' : '' %>" href="<%= h.qs(query, {show: ''}) %>">ทุกชุด</a>
           <a class="chip <%= onlyAvailable ? 'active' : '' %>" href="<%= h.qs(query, {show: 'available'}) %>">เฉพาะที่ว่าง</a>
         </div>
-        <% if (anyFilter) { %><p style="margin-top:16px"><a class="link small" href="/">ล้างตัวกรองทั้งหมด</a></p><% } %>
+        <% if (rental.date || query.q || measure.size || measure.active.length) { %><p style="margin-top:16px"><a class="link small" href="/?start_date=">ล้างการค้นหาทั้งหมด</a></p><% } %>
       </aside>
     </div>
 
