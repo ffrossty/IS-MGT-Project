@@ -8,8 +8,8 @@
   <form method="get" action="/" class="fit-panel" style="margin-top:22px" data-clean>
     <% ['start_date','start_time','days','sort','show'].forEach(k => { if (query[k]) { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>"><% } }) %>
     <div class="fit-top">
-      <div class="field fit-q"><label for="q">ชื่อชุด</label>
-        <input type="search" id="q" name="q" value="<%= query.q || '' %>" placeholder="เช่น เดรสลูกไม้ ชุดไทย"></div>
+      <div class="field fit-q"><label for="q">ค้นหาชุด</label>
+        <input type="search" id="q" name="q" value="<%= query.q || '' %>" placeholder="พิมพ์ชื่อชุด สี หรือแบบที่ต้องการ ภาษาไทยหรืออังกฤษก็ได้" autocomplete="off"></div>
       <div class="field fit-size"><label for="size">ไซส์</label>
         <select id="size" name="size">
           <option value="">ทุกไซส์</option>
@@ -110,8 +110,9 @@
             <% const nFree = products.filter(p => p.availability === 'available').length; %>
             <%= products.length %> ชุด · ว่าง <strong style="color:var(--ink)"><%= nFree %></strong> ชุด สำหรับ <%= T.date(rental.startAt) %> · <%= rental.days %> วัน
           <% } else { %>
-            <%= products.length %> ชุดในคอลเลกชัน<% if (measure.size) { %> · ไซส์ <%= measure.size %><% } %><% if (measure.active.length) { %> · <%= measure.active.map(m => m.ab + ' ' + (m.free ? 'Freesize' : m.min != null && m.max != null ? m.min + '–' + m.max : m.min != null ? '≥ ' + m.min : '≤ ' + m.max)).join(', ') %><% } %>
+            <%= products.length %> ชุดในคอลเลกชัน<% if (query.q) { %> · ค้นหา “<%= query.q %>”<% } %><% if (measure.size) { %> · ไซส์ <%= measure.size %><% } %><% if (measure.active.length) { %> · <%= measure.active.map(m => m.ab + ' ' + (m.free ? 'Freesize' : m.min != null && m.max != null ? m.min + '–' + m.max : m.min != null ? '≥ ' + m.min : '≤ ' + m.max)).join(', ') %><% } %>
           <% } %>
+          <% if (searchRelaxed) { %><div class="small" style="margin-top:4px;color:var(--accent-ink)">ไม่พบชุดที่ตรงทุกคำ — แสดงชุดที่ใกล้เคียงกับ “<%= query.q %>”</div><% } %>
         </div>
         <form method="get" action="/">
           <% Object.keys(query).filter(k => k !== 'sort').forEach(k => { %><input type="hidden" name="<%= k %>" value="<%= query[k] %>"><% }) %>

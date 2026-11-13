@@ -5,6 +5,7 @@ const A = require('../lib/availability');
 const O = require('../lib/orders');
 const T = require('../lib/time');
 const L = require('../lib/labels');
+const Search = require('../lib/search-terms');
 const { unitPrice, priceDetail, tiers } = require('../lib/pricing');
 const { requireLogin } = require('../middleware/auth');
 const addr = require('../lib/thai-address');
@@ -100,7 +101,10 @@ router.get('/', (req, res) => {
   const q = req.query;
   const where = ['p.is_active = 1', 'p.deleted_at IS NULL'];
   const params = {};
-  if (q.q) { where.push('(p.name LIKE @q OR p.description LIKE @q)'); params.q = `%${q.q}%`; }
+  // ค้นหาชื่อชุดได้ทั้งไทยและอังกฤษ (เดรส → Dress, ดอกไม้ → Floral, ขาว → White …) — ดู src/lib/search-terms.js
+  const text = q.q ? Search.sqlFor(String(q.q).slice(0, 100), params) : null;
+  const textAt = where.length;
+  if (text && text.sql) where.push(`(${text.sql})`);
   // สัดส่วน B / W / H / L (นิ้ว): ลูกค้าใส่ช่วง "ตั้งแต่ … ถึง …" — ชุดที่ค่าอยู่ในช่วงเท่านั้นที่แสดง
   const measure = readMeasureFilter(q);
   //   • Freesize → เฉพาะชุดที่สัดส่วนนั้นเป็น Freesize
@@ -119,9 +123,17 @@ router.get('/', (req, res) => {
   const sort = { price_asc: 'p.base_price ASC', price_desc: 'p.base_price DESC', popular: 'pop DESC' }[q.sort] || 'p.created_at DESC';
   const skuMatch = skuWhere.length ? db.prepare(`SELECT s.id FROM skus s WHERE s.product_id = ? AND s.deleted_at IS NULL AND ${skuWhere.join(' AND ')}`) : null;
   const skuParams = Object.fromEntries(Object.entries(params).filter(([k]) => skuWhere.join(' ').includes('@' + k)));
-  const rows = db.prepare(`SELECT p.*,
+  const runQuery = () => db.prepare(`SELECT p.*,
       (SELECT COUNT(*) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = p.id AND o.status IN ('confirmed','returned','completed')) AS pop
     FROM products p WHERE ${where.join(' AND ')} ORDER BY ${sort}`).all(params);
+  let rows = runQuery();
+  // nothing found and the query had words we don't know ("เดรสสวยๆ") → retry with the recognised words only
+  let searchRelaxed = false;
+  if (!rows.length && text && text.literals && text.terms) {
+    const relaxed = Search.sqlFor(String(q.q).slice(0, 100), params, { literals: false });
+    where[textAt] = `(${relaxed.sql})`;
+    rows = runQuery(); searchRelaxed = rows.length > 0;
+  }
 
   const qtyNeeded = 1;
   let rentalError = null;
@@ -138,7 +150,7 @@ router.get('/', (req, res) => {
 
   const due = validRental.startAt ? A.windowFor(null, validRental.startAt, validRental.days) : null;
   res.render('shop/home', {
-    title: null, products, measure, sizes: SIZES, rental, rentalError, due, timeOptions: timeOptions(),
+    title: null, products, measure, sizes: SIZES, searchRelaxed, rental, rentalError, due, timeOptions: timeOptions(),
     durations: A.durationOptions(), qtyNeeded, onlyAvailable, totalBeforeFilter: rows.length, note: availabilityNote(),
   });
 });
