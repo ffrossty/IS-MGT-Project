@@ -68,6 +68,12 @@
           <p class="muted small">ชุดนี้ยังไม่เปิดให้จอง</p>
         <% } %>
 
+        <div class="card cal-card">
+          <div class="card-title"><h3>ปฏิทินวันว่าง</h3><span class="small muted" data-cal-note></span></div>
+          <div class="cal" data-calendar></div>
+          <div class="cal-legend"><span class="l-free">ว่าง (แตะเพื่อเลือกวันเริ่มเช่า)</span><span class="l-full">เต็ม</span><span class="l-closed">ปิดรับจอง</span></div>
+        </div>
+
         <div class="form-grid">
           <div class="field">
             <label for="b_date" class="req">วันเริ่มเช่า</label>
@@ -107,12 +113,6 @@
         </div>
         <p class="small muted" style="margin-top:10px">ระยะเวลาเช่านับเป็นชั่วโมงจากเวลาที่เริ่มเช่า (1 วัน = 24 ชม.) · ร้านใช้เวลาเตรียมชุด <%= buffers.before %> ชม. ก่อนเริ่มเช่า และตรวจสอบ/ทำความสะอาด <%= buffers.after %> ชม. หลังคืน</p>
       </form>
-
-      <div class="card" style="margin-top:22px">
-        <div class="card-title"><h3>ปฏิทินวันว่าง</h3><span class="small muted" data-cal-note></span></div>
-        <div class="cal" data-calendar></div>
-        <div class="cal-legend"><span class="l-free">ว่าง (เริ่มเช่าได้)</span><span class="l-full">เต็ม</span><span class="l-closed">ปิดรับจอง</span></div>
-      </div>
 
       <div style="margin-top:22px">
         <details class="acc" open><summary>รายละเอียดสินค้า</summary><div><%= p.description || '-' %></div></details>

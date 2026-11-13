@@ -741,3 +741,15 @@ select { min-height: 46px; }
 }
 .danger-zone { border-color: #e9c3bd; background: #fffaf9; }
 .danger-zone h3 { color: var(--bad); }
+
+/* ghost / danger buttons must not turn black on hover (overrides the generic .btn:hover) */
+.btn.ghost:hover { background: var(--line-2); color: var(--ink); }
+.btn.danger:hover { background: var(--bad-soft); color: var(--bad); }
+.btn.line:hover { background: #05b04c; }
+/* cart: remove link */
+.cart-remove { margin-top: 10px; }
+.remove-link { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid transparent; border-radius: 999px; padding: 5px 12px 5px 10px; margin-left: -10px; font: inherit; font-size: .82rem; color: var(--muted); cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
+.remove-link:hover, .remove-link:focus-visible { color: var(--bad); background: var(--bad-soft); border-color: #efd2cd; }
+/* product page: availability calendar sits right under the size choice */
+.cal-card { margin: 4px 0 16px; padding: 16px 18px; box-shadow: none; }
+.cal-card .card-title { margin-bottom: 6px; }
